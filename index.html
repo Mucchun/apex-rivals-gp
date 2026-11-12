@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0a0b10">
+<title>Apex Rivals GP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Titillium+Web:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#0a0b10;--panel:rgba(14,15,22,.86);--line:rgba(255,255,255,.1);--ink:#f3f4f8;--muted:#9aa0b4;--red:#e10600;--gold:#ffd23f;--green:#35e08a;--purple:#b46bff;--display:'Russo One','Arial Black',Impact,sans-serif;--body:'Titillium Web',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hidden{display:none!important}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;gap:18px;padding:28px 18px;overflow:auto;background:linear-gradient(180deg,rgba(10,11,16,.5),rgba(10,11,16,.9))}
+.screen::before,.screen::after{content:'';flex:1 0 0px}
+h1{font-family:var(--display);font-size:clamp(40px,9vw,104px);line-height:.92;margin:0;text-align:center;letter-spacing:1px;font-style:italic;text-shadow:0 8px 40px rgba(0,0,0,.7)}
+h1 em{color:var(--red);font-style:italic}
+h2{font-family:var(--display);font-size:clamp(20px,3vw,30px);margin:0;font-style:italic;letter-spacing:.5px}
+.kicker{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:700}
+.sub{color:#c9cde0;max-width:62ch;text-align:center;line-height:1.5;margin:0;font-size:17px}
+.panel{background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:6px 18px 6px 18px;padding:20px;width:min(100%,1080px);display:flex;flex-direction:column;gap:14px}
+button{font-family:var(--display);font-size:16px;font-style:italic;letter-spacing:1px;color:#fff;background:var(--red);border:0;border-radius:4px 12px 4px 12px;padding:13px 26px;cursor:pointer;transition:transform .1s,filter .1s}
+button:hover{transform:translateY(-2px);filter:brightness(1.15)}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+button.alt{background:rgba(255,255,255,.1)}
+button.big{font-size:22px;padding:18px 46px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
+label.cap{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.keys{color:var(--muted);font-size:14px;text-align:center;line-height:1.7;max-width:70ch;margin:0}
+.keys b{color:#fff;background:rgba(255,255,255,.12);border-radius:4px;padding:1px 7px;font-weight:600}
+/* garage */
+.garage{display:grid;grid-template-columns:1fr 300px;gap:18px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.dcard{background:rgba(255,255,255,.05);border:2px solid transparent;border-radius:4px 12px 4px 12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--body);font-style:normal;letter-spacing:0;color:var(--ink)}
+.dcard canvas{width:84px;height:84px}
+.dcard b{font-size:14px;line-height:1.1}.dcard small{font-size:11px;color:var(--muted)}
+.dcard.sel{border-color:var(--red);background:rgba(225,6,0,.16)}
+.dinfo{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.dinfo canvas{width:150px;height:150px;align-self:center}
+.dinfo .num{font-family:var(--display);font-size:54px;line-height:.8;font-style:italic;opacity:.9}
+.dinfo p{margin:0;color:#c9cde0;line-height:1.45;font-size:15px}
+.gauge{width:100%;display:grid;grid-template-columns:86px 1fr;align-items:center;gap:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.gauge i{display:block;height:9px;background:rgba(255,255,255,.1);border-radius:9px;overflow:hidden}.gauge i b{display:block;height:100%;background:var(--red);border-radius:9px;transition:width .25s}
+/* setup */
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:9px 16px;font-size:14px;background:rgba(255,255,255,.08)}
+.seg button.on{background:var(--red)}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tcard{background:rgba(255,255,255,.05);border:2px solid transparent;border-radius:4px 12px 4px 12px;padding:8px;display:flex;flex-direction:column;gap:4px;align-items:stretch;font-family:var(--body);font-style:normal;letter-spacing:0;text-align:left;color:var(--ink)}
+.tcard canvas{width:100%;aspect-ratio:16/10;border-radius:3px 9px 3px 9px}
+.tcard b{font-size:15px}.tcard small{color:var(--muted);font-size:12px}
+.tcard.sel{border-color:var(--red)}
+.tcard .n{font-family:var(--display);color:var(--gold);font-size:12px;font-style:italic}
+/* hud */
+#hud{position:fixed;inset:0;pointer-events:none;font-family:var(--body)}
+#hPos{position:absolute;right:max(18px,env(safe-area-inset-right));top:14px;font-family:var(--display);font-style:italic;font-size:clamp(52px,9vw,96px);line-height:1;text-shadow:0 4px 0 rgba(0,0,0,.55)}
+#hPos small{font-size:.36em;color:var(--muted);margin-left:4px}
+#hLap{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:rgba(10,11,16,.75);border-bottom:3px solid var(--red);padding:6px 16px;border-radius:0 0 10px 10px;font-weight:700;font-size:16px;letter-spacing:.06em;white-space:nowrap}
+#hLap span{color:var(--muted);font-size:12px;letter-spacing:.16em}
+#tower{position:absolute;left:max(12px,env(safe-area-inset-left));top:14px;display:flex;flex-direction:column;gap:2px;font-size:13px;font-weight:700}
+#tower div{display:grid;grid-template-columns:22px 5px 40px;gap:6px;align-items:center;background:rgba(10,11,16,.72);padding:2px 8px 2px 4px;border-radius:2px}
+#tower div.me{background:#fff;color:#111}
+#tower div u{display:block;width:5px;height:15px;border-radius:2px;text-decoration:none}
+#tower div span{text-align:right;color:var(--muted)}#tower div.me span{color:#555}
+#hSpeed{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:18px;text-align:right;font-family:var(--display);font-style:italic;font-size:clamp(34px,6vw,60px);line-height:1;text-shadow:0 3px 0 rgba(0,0,0,.55)}
+#hSpeed small{display:block;font-size:13px;color:var(--muted);letter-spacing:.2em;font-family:var(--body);font-style:normal;font-weight:700}
+#chips{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:96px;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.chip{font-family:var(--display);font-style:italic;font-size:15px;padding:4px 12px;border-radius:3px 9px 3px 9px;background:rgba(10,11,16,.7);color:#555;letter-spacing:1px}
+.chip.on{background:var(--green);color:#03170c}.chip.t1{background:#39a8ff;color:#001a33}.chip.t2{background:#ff8a1f;color:#2b1000}.chip.t3{background:var(--purple);color:#19003a}
+#hItem{position:absolute;left:50%;top:60px;transform:translateX(-50%);width:74px;height:74px;border-radius:6px 16px 6px 16px;background:rgba(10,11,16,.75);border:2px solid var(--line);display:grid;place-items:center;font-size:38px}
+#hItem small{position:absolute;bottom:-20px;font-size:11px;letter-spacing:.14em;color:#fff;font-weight:700;white-space:nowrap;text-shadow:0 1px 3px #000}
+#hMsg{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-family:var(--display);font-style:italic;font-size:clamp(26px,5vw,54px);text-align:center;text-shadow:0 4px 0 rgba(0,0,0,.6);opacity:0;transition:opacity .25s;white-space:nowrap}
+#hMsg.on{opacity:1}
+#lights{position:absolute;left:50%;top:22%;transform:translateX(-50%);display:flex;gap:12px;background:#08090d;padding:14px 18px;border-radius:14px;border:2px solid #23252f}
+#lights i{width:clamp(30px,6vw,54px);aspect-ratio:1;border-radius:50%;background:#1b1c22;box-shadow:inset 0 0 10px #000}
+#lights i.on{background:#ff1a0d;box-shadow:0 0 30px #ff1a0d,inset 0 0 8px #ffb3ad}
+#minimap{position:absolute;left:max(12px,env(safe-area-inset-left));bottom:14px;width:170px;height:170px;opacity:.95}
+#hTime{position:absolute;right:max(18px,env(safe-area-inset-right));top:calc(18px + clamp(52px,9vw,96px));text-align:right;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+#hTime span{display:block;color:var(--muted);font-size:12px}
+#wrong{position:absolute;left:50%;top:44%;transform:translateX(-50%);font-family:var(--display);font-size:30px;color:var(--gold);background:rgba(10,11,16,.8);padding:6px 18px;border-radius:6px}
+/* touch */
+#touch{position:fixed;inset:0;pointer-events:none;display:none}
+@media (pointer:coarse){#touch.on{display:block}#minimap{width:110px;height:110px;bottom:auto;top:40%}#tower{display:none}}
+#touch button{position:absolute;pointer-events:auto;width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3);font-size:13px;padding:0;touch-action:none}
+#touch button.dn{background:rgba(225,6,0,.6)}
+#tL{left:18px;bottom:26px}#tR{left:116px;bottom:26px}
+#tDrift{right:18px;bottom:26px}#tBrake{right:116px;bottom:26px}#tItem{right:60px;bottom:124px}
+/* results */
+table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
+td,th{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+td:first-child{font-family:var(--display);font-style:italic;width:34px}
+tr.me td{background:rgba(225,6,0,.22);font-weight:700}
+td u{display:inline-block;width:5px;height:14px;border-radius:2px;margin-right:8px;vertical-align:-2px;text-decoration:none}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+#pause{background:rgba(10,11,16,.8);justify-content:center}
+#err{position:fixed;left:8px;right:8px;bottom:8px;background:#40060a;color:#ffd7d7;font:12px/1.4 ui-monospace,monospace;padding:8px 10px;border-radius:6px;z-index:99;white-space:pre-wrap}
+@media (max-width:820px){.garage,.cols{grid-template-columns:1fr}.dinfo canvas{width:110px;height:110px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<section class="screen" id="home">
+  <p class="kicker">Arcade Grand Prix Racing</p>
+  <h1>APEX <em>RIVALS</em> GP</h1>
+  <p class="sub">Twelve rival drivers, six circuits, open-wheel rockets. Slide through corners to charge a turbo, tuck into a slipstream to open the DRS, and use pit-wall power-ups to ruin everybody else's Sunday. Four-race championship, points at every flag, one podium.</p>
+  <div class="row"><button class="big" id="btnPlay">ENTER THE PADDOCK</button></div>
+  <p class="keys"><b>↑</b>/<b>W</b> throttle · <b>↓</b>/<b>S</b> brake · <b>←</b> <b>→</b> steer · hold <b>Shift</b> or <b>Space</b> while turning to slide — sparks go blue, orange, purple; release for turbo · <b>E</b> use power-up · <b>C</b> look back · <b>M</b> mute · <b>Esc</b> pause. Launch: hit the throttle just as the lights go out.</p>
+</section>
+
+<section class="screen hidden" id="garage">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between"><h2>Choose your driver</h2><p class="kicker">Step 1 / 2</p></div>
+    <div class="garage">
+      <div class="dgrid" id="dgrid" role="listbox" aria-label="Drivers"></div>
+      <div class="dinfo">
+        <canvas id="dPortrait" width="300" height="300"></canvas>
+        <div class="row" style="justify-content:flex-start;gap:14px"><span class="num" id="dNum">7</span><div><h2 id="dName"></h2><label class="cap" id="dTeam"></label></div></div>
+        <p id="dQuote"></p>
+        <div class="gauge"><span>Top speed</span><i><b id="gSpeed"></b></i></div>
+        <div class="gauge"><span>Cornering</span><i><b id="gTurn"></b></i></div>
+        <div class="row" style="width:100%;margin-top:6px"><button class="alt" id="btnBackHome">Back</button><button id="btnToSetup" style="flex:1">Sign contract</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="setup">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between"><h2>Race weekend</h2><p class="kicker">Step 2 / 2</p></div>
+    <div><label class="cap">Mode</label><div class="seg" id="segMode"><button data-v="cup" class="on">Championship · 4 races</button><button data-v="single">Single race</button></div></div>
+    <div><label class="cap">Rivals</label><div class="seg" id="segDiff"><button data-v="0">Rookie</button><button data-v="1" class="on">Pro</button><button data-v="2">Legend</button></div></div>
+    <div><label class="cap" id="tLabel">Calendar</label><div class="tgrid" id="tgrid"></div></div>
+    <div class="row"><button class="alt" id="btnBackGarage">Back</button><button class="alt" id="btnShuffle">Shuffle calendar</button><button class="big" id="btnRace">LIGHTS OUT</button></div>
+  </div>
+</section>
+
+<div id="hud" class="hidden">
+  <div id="tower"></div>
+  <div id="hLap"><span>LAP</span><b id="hLapN">1/3</b><span id="hTrack"></span></div>
+  <div id="hItem" class="hidden"><span id="hItemIcon"></span><small id="hItemName"></small></div>
+  <div id="hPos">1<small>st</small></div>
+  <div id="hTime"><b id="hClock">0:00.000</b><span id="hBest"></span></div>
+  <div id="chips"><div class="chip" id="cDrs">DRS</div><div class="chip" id="cTurbo">TURBO</div></div>
+  <div id="hSpeed">0<small>KM/H</small></div>
+  <div id="lights" class="hidden"><i></i><i></i><i></i><i></i><i></i></div>
+  <div id="hMsg"></div>
+  <div id="wrong" class="hidden">WRONG WAY</div>
+  <canvas id="minimap" width="340" height="340"></canvas>
+</div>
+<div id="touch">
+  <button id="tL" data-k="left" aria-label="Steer left">◀</button><button id="tR" data-k="right" aria-label="Steer right">▶</button>
+  <button id="tItem" data-k="item" aria-label="Use power-up">ITEM</button><button id="tBrake" data-k="brake" aria-label="Brake">BRAKE</button><button id="tDrift" data-k="drift" aria-label="Slide">SLIDE</button>
+</div>
+
+<section class="screen hidden" id="pause">
+  <h2>Paused</h2>
+  <div class="row"><button id="btnResume">Resume</button><button class="alt" id="btnRestart">Restart race</button><button class="alt" id="btnQuit">Quit to paddock</button></div>
+</section>
+
+<section class="screen hidden" id="results">
+  <div class="panel">
+    <p class="kicker" id="rKicker"></p>
+    <h2 id="rTitle">Chequered flag</h2>
+    <div class="cols"><div><label class="cap">Race classification</label><table id="rTable"></table></div><div id="rStandBox"><label class="cap">Championship standings</label><table id="rStand"></table></div></div>
+    <div class="row"><button id="btnNext">Next race</button><button class="alt" id="btnResQuit">Back to paddock</button></div>
+  </div>
+</section>
+
+<script>
+/* Safari sometimes returns null from WebGL info queries; guard so three.js can still start. */
+(function(){function p(proto){if(!proto)return;var o=proto.getShaderPrecisionFormat;if(o)proto.getShaderPrecisionFormat=function(){return o.apply(this,arguments)||{rangeMin:127,rangeMax:127,precision:23}};var g=proto.getParameter;if(g)proto.getParameter=function(k){var v=g.apply(this,arguments);if(v===null){if(k===0x1F02)return'WebGL 2.0';if(k===0x8B8C)return'WebGL GLSL ES 3.00';if(k===0x1F00||k===0x1F01)return'WebKit'}return v}}
+if(typeof WebGLRenderingContext!=='undefined')p(WebGLRenderingContext.prototype);
+if(typeof WebGL2RenderingContext!=='undefined')p(WebGL2RenderingContext.prototype);
+function show(m){var e=document.getElementById('err');if(!e){e=document.createElement('div');e.id='err';document.body.appendChild(e)}e.textContent=m}
+addEventListener('error',function(e){show('Error: '+(e.message||e.error))});
+addEventListener('unhandledrejection',function(e){show('Error: '+(e.reason&&e.reason.message||e.reason))});})();
+</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script type="module" src="./game.js?v=1794509511"></script>
+</body>
+</html>
