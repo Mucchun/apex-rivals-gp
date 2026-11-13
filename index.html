@@ -336,7 +336,7 @@ addEventListener('error',function(e){show('Error: '+(e.message||e.error))});
 addEventListener('unhandledrejection',function(e){show('Error: '+(e.reason&&e.reason.message||e.reason))});})();
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script>setTimeout(function(){var l=document.getElementById("loading");if(l)l.classList.add("out")},16000);addEventListener("error",function(){var l=document.getElementById("loading");if(l)l.classList.add("out")});</script>
-<script type="module" src="./game.js?v=1794600011"></script>
+<script>setTimeout(function(){var l=document.getElementById("loading");if(l&&!window.__alive)l.classList.add("out")},16000);addEventListener("error",function(){var l=document.getElementById("loading");if(l)l.classList.add("out")});</script>
+<script type="module" src="./game.js?v=1794600012"></script>
 </body>
 </html>
