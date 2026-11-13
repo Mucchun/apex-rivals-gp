@@ -667,9 +667,12 @@ function frame(now) {
 const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), ended: false, max: 9000 };
 // stays up until the assets are in AND the clip has played to its end (max is the fallback if the video can't play)
 function ldPaint() {
-  const el = performance.now() - LD.since, v = LD.vid, vf = v.duration ? v.currentTime / v.duration : el / LD.max;
+  const el = performance.now() - LD.since, v = LD.vid;
+  // Safari (and low-power mode) can refuse to autoplay: then run on a 3.5 s timer instead of waiting for the video
+  if (el > 1200) LD.noVid = v.currentTime === 0 || (v.paused && !v.ended);
+  const vf = LD.noVid ? el / 3500 : v.duration ? v.currentTime / v.duration : 0;
   LD.bp = Math.max(LD.bp || 0, Math.min(LD.total ? LD.done / LD.total : 0, LD.ended ? 1 : vf)); LD.bar.style.width = Math.round(100 * LD.bp) + '%';
-  if (LD.on && LD.done >= LD.total && (LD.ended || (el > LD.max && (v.paused || !v.currentTime)) || el > 20000)) ldHide();
+  if (LD.on && LD.done >= LD.total && (LD.ended || (LD.noVid && el > 3500) || el > 15000)) ldHide();
 }
 LD.vid.addEventListener('ended', () => { if (LD.done >= LD.total) { LD.ended = true; ldPaint(); } else ldPlay(); });
 setInterval(() => { if (LD.on) ldPaint(); }, 100);
@@ -677,7 +680,8 @@ LD.vid.addEventListener('error', () => { LD.max = 5000; });
 function ldPlay() { try { LD.vid.currentTime = 0; } catch (e) {} const pr = LD.vid.play(); if (pr) pr.catch(() => {}); }
 function track(p) { LD.total++; return p.then(v => { LD.done++; if (LD.on) ldPaint(); return v; }); }
 function ldHide() { LD.on = false; LD.el.classList.add('out'); }
-function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); }
+function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.noVid = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); }
+ldPlay();
 track(loadCarModel()).then(() => { buildUI(); attract(); requestAnimationFrame(frame); });
 
 /* debug / test hook */
