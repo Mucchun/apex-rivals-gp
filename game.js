@@ -688,7 +688,7 @@ function finishRace() {
   st.races++; if (pi === 0) st.wins++; if (pi < 3) st.podiums++; if (net) { st.oraces++; if (pi === 0) st.owins++; } if (bl && (!st.best[tid] || bl < st.best[tid])) st.best[tid] = Math.round(bl * 1000) / 1000;
   SAVE.coins += earn; saveSave(); paintCoins(); $('rCoins').textContent = '+' + earn + ' coins' + (champ ? ' (champion bonus included)' : '') + ' · you have ' + SAVE.coins;
   $('btnNext').textContent = net ? 'Back to lobby' : last ? (G.mode === 'cup' ? 'New season' : 'Race again') : 'Next race'; $('btnResQuit').textContent = net ? 'Leave room' : 'Back to paddock';
-  G.phase = 'results'; show('results'); stopEngine(); music('music_menu'); offerDouble(earn); adBreak(); if (net && NET.host) netLobby();
+  G.phase = 'results'; show('results'); stopEngine(); music('music_menu'); pgMsg('level_completed'); offerDouble(earn); adBreak(); if (net && NET.host) netLobby();
 }
 function msg(text, color) { const e = $('hMsg'); e.textContent = text; e.style.color = color || '#fff'; e.classList.add('on'); clearTimeout(msg.t); msg.t = setTimeout(() => e.classList.remove('on'), 1500); }
 
@@ -700,7 +700,7 @@ function update(dt) {
     if (lit !== G.lit) { G.lit = lit; document.querySelectorAll('#lights i').forEach((e, i) => e.classList.toggle('on', i < lit)); gantryLights.forEach((m, i) => m.color.set(i < lit ? '#ff2a1a' : '#2a0705')); if (lit) sfx('count'); }
     const thr = playerInput().thr; if (thr && G.thrDown == null) G.thrDown = G.t; if (!thr) G.thrDown = null;
     if (G.t >= G.lightsOut) {
-      G.phase = 'race'; G.rt = 0; sfx('go'); setTimeout(() => $('lights').classList.add('hidden'), 700);
+      G.phase = 'race'; G.rt = 0; sfx('go'); pgMsg('level_started'); setTimeout(() => $('lights').classList.add('hidden'), 700);
       const p = G.player, held = G.thrDown == null ? -1 : G.t - G.thrDown;
       if (held >= 0 && held < .5) { p.boost = 1.3; msg('PERFECT LAUNCH!', '#35e08a'); } else if (held > 2) { p.launch = 1; G.wheelspin = .9; msg('WHEELSPIN!', '#ffd23f'); } else msg('LIGHTS OUT!', '#fff');
       for (const c of G.cars) c.lapStart = 0;
@@ -844,6 +844,8 @@ document.addEventListener('visibilitychange', () => { AUD.hidden = document.hidd
 document.addEventListener('contextmenu', e => { if (!(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) e.preventDefault(); });
 
 /* ───────── platform (Playgama Bridge): pause, mute, ads ───────── */
+// lifecycle messages: portals such as CrazyGames use these to know when the player is actually playing
+function pgMsg(name) { if (!PG) return; try { bridge.platform.sendMessage(name); } catch (e) {} }
 function adBreak() { if (!PG) return; try { if (bridge.advertisement.isInterstitialSupported) bridge.advertisement.showInterstitial('race_end'); } catch (e) {} }
 function offerDouble(earn) { const b = $('btnDouble'); let ok = false; try { ok = PG && bridge.advertisement.isRewardedSupported; } catch (e) {} b.classList.toggle('hidden', !ok || !earn); G.dbl = ok ? earn : 0; b.textContent = 'Watch an ad: double your coins (+' + earn + ')'; b.disabled = false; }
 if (PG) {
@@ -900,11 +902,11 @@ function buildUI() {
   $('hPause').onclick = () => togglePause(); $('hMute').onclick = toggleMute; $('hPause').innerHTML = IC.pause; $('hMute').innerHTML = IC.sound;
   $('btnResQuit').onclick = quit; $('btnQuit').onclick = quit; $('btnResume').onclick = () => togglePause(false); $('btnRestart').onclick = () => { if (G.mode !== 'net') startRace(G.track); };
   // touch
-  G.touch = matchMedia('(pointer:coarse)').matches;
+  G.touch = matchMedia('(pointer:coarse)').matches; if (PG) try { const dt = bridge.device.type; if (dt === 'mobile' || dt === 'tablet') G.touch = true; else if (dt === 'desktop' && !('ontouchstart' in window)) G.touch = false; } catch (e) {}
   document.querySelectorAll('#touch button').forEach(b => { const k = b.dataset.k; const set = v => e => { e.preventDefault(); keys[k] = v; b.classList.toggle('dn', v); }; b.addEventListener('pointerdown', set(true)); b.addEventListener('pointerup', set(false)); b.addEventListener('pointercancel', set(false)); b.addEventListener('pointerleave', set(false)); });
 }
 function toggleMute() { G.muted = !G.muted; SAVE.set.mute = G.muted; saveSave(); audioGate(); }
-function togglePause(v) { if (!['count', 'race', 'finish'].includes(G.phase)) return; G.paused = v == null ? !G.paused : v; show(G.paused ? 'pause' : 'hud'); sfx('pause'); }
+function togglePause(v) { if (!['count', 'race', 'finish'].includes(G.phase)) return; G.paused = v == null ? !G.paused : v; show(G.paused ? 'pause' : 'hud'); sfx('pause'); if (G.phase === 'race') pgMsg(G.paused ? 'level_paused' : 'level_resumed'); }
 const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ShiftLeft: 'drift', ShiftRight: 'drift', Space: 'drift', KeyC: 'look' };
 addEventListener('keydown', e => {
   if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
@@ -947,8 +949,8 @@ setInterval(() => { if (LD.on) ldPaint(); }, 100);
 LD.vid.addEventListener('error', () => { LD.max = 5000; });
 function ldPlay() { try { LD.vid.currentTime = 0; } catch (e) {} const pr = LD.vid.play(); if (pr) pr.catch(() => {}); }
 function track(p) { LD.total++; return p.then(v => { LD.done++; if (LD.on) ldPaint(); return v; }); }
-function ldHide() { LD.on = false; LD.el.classList.add('out'); if (PG && !LD.ready) { LD.ready = true; try { bridge.platform.sendMessage('game_ready'); } catch (e) {} } }
-function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.noVid = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); }
+function ldHide() { LD.on = false; LD.el.classList.add('out'); if (PG && !LD.ready) { LD.ready = true; try { bridge.platform.sendMessage('game_ready'); } catch (e) {} } else pgMsg('in_game_loading_stopped'); }
+function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.noVid = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); pgMsg('in_game_loading_started'); }
 ldPlay();
 /* ───────── online: rooms over WebRTC (PeerJS). The room host runs the bots and relays everyone's cars ───────── */
 const ROOM = 'apexrivalsgp-room-', WORLD_ID = 'apexrivalsgp-world-v1';
