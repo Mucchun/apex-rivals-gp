@@ -664,7 +664,7 @@ function frame(now) {
   renderer.render(scene, camera);
 }
 /* loading screen: video backdrop + progress bar, shown at boot and while a circuit's scenery downloads */
-const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), ended: false, max: 6000 };
+const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), ended: false, max: 9000 };
 // stays up until the assets are in AND the clip has played to its end (max is the fallback if the video can't play)
 function ldPaint() {
   const el = performance.now() - LD.since, v = LD.vid, vf = v.duration ? v.currentTime / v.duration : el / LD.max;
@@ -673,7 +673,7 @@ function ldPaint() {
 }
 LD.vid.addEventListener('ended', () => { if (LD.done >= LD.total) { LD.ended = true; ldPaint(); } else ldPlay(); });
 setInterval(() => { if (LD.on) ldPaint(); }, 100);
-LD.vid.addEventListener('error', () => { LD.max = 2500; });
+LD.vid.addEventListener('error', () => { LD.max = 5000; });
 function ldPlay() { try { LD.vid.currentTime = 0; } catch (e) {} const pr = LD.vid.play(); if (pr) pr.catch(() => {}); }
 function track(p) { LD.total++; return p.then(v => { LD.done++; if (LD.on) ldPaint(); return v; }); }
 function ldHide() { LD.on = false; LD.el.classList.add('out'); }
