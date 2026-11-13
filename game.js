@@ -465,7 +465,7 @@ function startRace(trackIdx) {
   G.phase = 'count'; G.t = 0; G.rt = 0; G.lightsOut = 6 + rnd(.2, 1.1); G.finT = 0; G.paused = false; G.thrDown = null; G.camH = G.player.h;
   show('hud'); $('lights').classList.remove('hidden'); $('hTrack').textContent = TRACKS[trackIdx].name.toUpperCase(); $('hBest').textContent = '';
   for (const k in keys) keys[k] = false;
-  $('touch').classList.add('on'); initAudio(); updateHud(true); ldShow(2000);
+  $('touch').classList.add('on'); initAudio(); updateHud(true); ldShow();
 }
 function attract() { G.phase = 'menu'; buildWorld(pick(TRACKS)); spawnCars(null); for (const c of G.cars) c.launch = 0; $('touch').classList.remove('on'); }
 function finishRace() {
@@ -664,12 +664,20 @@ function frame(now) {
   renderer.render(scene, camera);
 }
 /* loading screen: video backdrop + progress bar, shown at boot and while a circuit's scenery downloads */
-const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), min: 5000, t: 0 };
+const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), ended: false, max: 6000 };
+// stays up until the assets are in AND the clip has played to its end (max is the fallback if the video can't play)
+function ldPaint() {
+  const el = performance.now() - LD.since, v = LD.vid, vf = v.duration ? v.currentTime / v.duration : el / LD.max;
+  LD.bp = Math.max(LD.bp || 0, Math.min(LD.total ? LD.done / LD.total : 0, LD.ended ? 1 : vf)); LD.bar.style.width = Math.round(100 * LD.bp) + '%';
+  if (LD.on && LD.done >= LD.total && (LD.ended || el > LD.max)) ldHide();
+}
+LD.vid.addEventListener('ended', () => { if (LD.done >= LD.total) { LD.ended = true; ldPaint(); } else ldPlay(); });
 setInterval(() => { if (LD.on) ldPaint(); }, 100);
-function ldPaint() { LD.bar.style.width = Math.round(100 * Math.min(LD.total ? LD.done / LD.total : 0, (performance.now() - LD.since) / LD.min)) + '%'; if (LD.on && LD.done >= LD.total) { clearTimeout(LD.t); LD.t = setTimeout(ldHide, Math.max(0, LD.min - (performance.now() - LD.since))); } }
-function track(p) { LD.total++; ldPaint(); return p.then(v => { LD.done++; ldPaint(); return v; }); }
-function ldHide() { if (LD.done < LD.total) return; LD.on = false; LD.el.classList.add('out'); setTimeout(() => { if (!LD.on) LD.vid.pause(); }, 600); }
-function ldShow(min) { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.since = performance.now(); LD.min = min; LD.el.classList.remove('out'); const pr = LD.vid.play(); if (pr) pr.catch(() => {}); ldPaint(); }
+LD.vid.addEventListener('error', () => { LD.max = 2500; });
+function ldPlay() { try { LD.vid.currentTime = 0; } catch (e) {} const pr = LD.vid.play(); if (pr) pr.catch(() => {}); }
+function track(p) { LD.total++; return p.then(v => { LD.done++; if (LD.on) ldPaint(); return v; }); }
+function ldHide() { LD.on = false; LD.el.classList.add('out'); }
+function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); }
 track(loadCarModel()).then(() => { buildUI(); attract(); requestAnimationFrame(frame); });
 
 /* debug / test hook */

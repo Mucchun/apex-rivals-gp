@@ -113,7 +113,7 @@ td u{display:inline-block;width:5px;height:14px;border-radius:2px;margin-right:8
 <canvas id="game"></canvas>
 
 <div id="loading" role="status" aria-live="polite">
-  <video id="ldVid" src="./media/loading.mp4" poster="./media/loading.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+  <video id="ldVid" src="./media/loading.mp4?v=2" poster="./media/loading.jpg?v=2" autoplay muted playsinline preload="auto" aria-hidden="true"></video>
   <h1>APEX <em>RIVALS</em> GP</h1>
   <div class="ldtrack"><div id="ldBar"></div></div>
   <p class="ldtxt">Warming the tyres</p>
@@ -196,6 +196,6 @@ addEventListener('error',function(e){show('Error: '+(e.message||e.error))});
 addEventListener('unhandledrejection',function(e){show('Error: '+(e.reason&&e.reason.message||e.reason))});})();
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script type="module" src="./game.js?v=1794600002"></script>
+<script type="module" src="./game.js?v=1794600003"></script>
 </body>
 </html>
