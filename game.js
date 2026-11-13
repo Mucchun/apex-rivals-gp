@@ -957,11 +957,24 @@ let peerLib = null;
 function loadPeer() { return peerLib || (peerLib = new Promise((res, rej) => { if (window.Peer) return res(); const s = document.createElement('script'); s.src = './vendor/peerjs.min.js'; s.onload = () => res(); s.onerror = () => { peerLib = null; rej(new Error('lib')); }; document.head.appendChild(s); })); }
 const netStatus = t => { $('netStatus').textContent = t; };
 const myName = () => SAVE.name || G.driver.name.split(' ')[0];
-const meP = () => ({ id: NET.id, uid: SAVE.uid, name: myName(), driver: G.driver.id, cos: cleanCos(SAVE.eq) });
-function netSend(m, except) { try { if (NET.host) { for (const [id, cn] of NET.conns) if (id !== except && cn.open) cn.send(m); } else if (NET.hc && NET.hc.open) NET.hc.send(m); } catch (e) {} }
+const meP = () => ({ id: NET.id, uid: SAVE.uid, name: (PG && pgName(NET.id)) || myName(), driver: G.driver.id, cos: cleanCos(SAVE.eq) });
+const MP = () => bridge.multiplayer;
+const pgOnline = () => { try { return PG && !!bridge.multiplayer && bridge.multiplayer.isSupported; } catch (e) { return false; } };
+const pgName = id => { try { const p = MP().players.find(x => x.id === id); return (p && cleanName(p.name)) || ''; } catch (e) { return ''; } };
+function pgEnter(code, host) { NET.on = true; NET.host = host; NET.id = MP().playerId; NET.code = code; NET.conns.clear(); if (host) { for (const p of MP().players) if (p.id !== NET.id) NET.conns.set(p.id, { open: true }); NET.players = [meP()]; netStatus(''); openLobby(); } else { NET.players = []; netSend(Object.assign({ t: 'hello' }, meP())); netStatus('Joined — waiting for the room…'); } }
+function pgBind() {
+  if (pgBind.done || !pgOnline()) return; pgBind.done = true; const E = bridge.EVENT_NAME;
+  MP().on(E.MULTIPLAYER_MESSAGE_RECEIVED, msg => { const d = msg && msg.data; if (!NET.on || !d || typeof d !== 'object') return; if (NET.host) { if (!NET.conns.has(msg.from)) NET.conns.set(msg.from, { open: true }); hostData(msg.from, d); } else if (msg.from === MP().hostId) guestData(d); else if (d.t === 's') netApply(d.c, msg.from); else if (d.t === 'ev') netOnEv(d); });
+  MP().on(E.MULTIPLAYER_PLAYER_JOINED, p => { if (NET.on && NET.host && p && p.id !== NET.id) NET.conns.set(p.id, { open: true }); });
+  MP().on(E.MULTIPLAYER_PLAYER_LEFT, p => { if (NET.on && NET.host && p) netDrop(p.id); });
+  MP().on(E.MULTIPLAYER_HOST_CHANGED, () => { if (NET.on && !!MP().isHost !== NET.host) netLeave('The host left, so the room closed.'); });
+  MP().on(E.MULTIPLAYER_ROOM_LEFT, reason => { if (NET.on) netLeave(reason === 'room_closed' ? 'The room was closed.' : 'Lost the connection to the room.'); });
+}
+function netSend(m, except) { if (PG) { if (except !== undefined || !NET.on) return; try { if (NET.host || m.t === 's' || m.t === 'ev') MP().send('m', m); else MP().send('m', m, { to: 'host' }); } catch (e) {} return; } try { if (NET.host) { for (const [id, cn] of NET.conns) if (id !== except && cn.open) cn.send(m); } else if (NET.hc && NET.hc.open) NET.hc.send(m); } catch (e) {} }
 function netEv(o) { if (!NET.on || G.mode !== 'net') return; o.t = 'ev'; netSend(o); }
-function netClose() { voiceStop(); try { if (NET.peer) NET.peer.destroy(); } catch (e) {} NET.peer = null; NET.on = false; NET.host = false; NET.conns.clear(); NET.hc = null; NET.players = []; NET.board = {}; NET.chat = []; NET.code = ''; worldHi(); }
+function netClose() { voiceStop(); const was = NET.on; NET.on = false; if (PG && was) try { MP().leaveRoom(); } catch (e) {} try { if (NET.peer) NET.peer.destroy(); } catch (e) {} NET.peer = null; NET.on = false; NET.host = false; NET.conns.clear(); NET.hc = null; NET.players = []; NET.board = {}; NET.chat = []; NET.code = ''; worldHi(); }
 async function netHost() {
+  if (PG) { if (!pgOnline()) return netStatus('Online play is not available here.'); pgBind(); netStatus('Opening a room…'); const pub = !!NET.pubNext; NET.pubNext = false; netClose(); try { const code = await MP().createRoom({ maxPlayers: 12, isVisible: pub, filter: { v: 1 } }); NET.pub = pub; pgEnter(code, true); } catch (e) { netStatus('Could not open a room (' + ((e && e.code) || 'connection error') + ').'); } return; }
   netStatus('Opening a room…'); try { await loadPeer(); } catch (e) { return netStatus('Could not load the online module.'); }
   netClose(); const code = Array.from({ length: 5 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ23456789')).join('');
   const peer = NET.peer = new Peer(ROOM + code); voiceHook(peer);
@@ -974,6 +987,7 @@ async function netHost() {
   peer.on('disconnected', () => { try { if (NET.peer === peer) peer.reconnect(); } catch (e) {} });
 }
 async function netJoin(code) {
+  if (PG) { code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (code.length < 4) return netStatus('Type the room code first.'); if (!pgOnline()) return netStatus('Online play is not available here.'); pgBind(); netStatus('Joining ' + code + '…'); netClose(); try { await MP().joinRoom(code); pgEnter(code, false); } catch (e) { const c = (e && e.code) || ''; netStatus(c === 'MULTIPLAYER_ROOM_NOT_FOUND' ? 'No room with the code ' + code + '.' : c === 'MULTIPLAYER_ROOM_FULL' ? 'That room is full.' : c === 'MULTIPLAYER_ROOM_CLOSED' ? 'That room is closed.' : 'Could not join (' + (c || 'connection error') + ').'); } return; }
   code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (code.length !== 5) return netStatus('Room codes are 5 characters.');
   netStatus('Joining ' + code + '…'); try { await loadPeer(); } catch (e) { return netStatus('Could not load the online module.'); }
   netClose(); const peer = NET.peer = new Peer(); voiceHook(peer);
@@ -990,7 +1004,7 @@ function netLobby() { worldHi(); const racing = G.mode === 'net' && ['count', 'r
 function netDrop(pid) { if (!NET.conns.has(pid)) return; NET.conns.delete(pid); NET.players = NET.players.filter(p => p.id !== pid); const m = { t: 'ev', k: 'tobot', own: pid }; netOnEv(m); netSend(m); netLobby(); }
 function hostData(pid, m) {
   if (!m || typeof m !== 'object' || !NET.conns.has(pid)) return;
-  if (m.t === 'hello') { const p = { id: pid, uid: cleanName(m.uid), name: cleanName(m.name) || 'Driver', driver: DRIVERS.some(d => d.id === m.driver) ? m.driver : 'val', cos: cleanCos(m.cos) }; const i = NET.players.findIndex(x => x.id === pid); if (i < 0) NET.players.push(p); else NET.players[i] = p; netLobby(); }
+  if (m.t === 'hello') { const p = { id: pid, uid: cleanName(m.uid), name: (PG && pgName(pid)) || cleanName(m.name) || 'Driver', driver: DRIVERS.some(d => d.id === m.driver) ? m.driver : 'val', cos: cleanCos(m.cos) }; const i = NET.players.findIndex(x => x.id === pid); if (i < 0) NET.players.push(p); else NET.players[i] = p; netLobby(); }
   else if (m.t === 's') { netApply(m.c, pid); netSend(m, pid); }
   else if (m.t === 'ev') { netOnEv(m); netSend(m, pid); }
   else if (m.t === 'chat') { const p = NET.players.find(x => x.id === pid); if (p) roomChat(p.name, m.text); }
@@ -1063,7 +1077,8 @@ const WORLD = { peer: null, hub: false, hc: null, cl: new Map(), hist: [], on: f
 function worldHiMsg() { return { t: 'hi', uid: SAVE.uid, name: myName(), room: NET.on ? NET.code : '', pub: !!(NET.on && NET.host && NET.pub), n: NET.players.length }; }
 function worldRooms() { const all = [...WORLD.cl.values()]; if (WORLD.me) all.push(WORLD.me); return all.filter(c => c.pub && c.room && c.n < 12).sort((a, b) => b.n - a.n).slice(0, 10).map(c => ({ code: c.room, name: c.name, n: c.n })); }
 function quickGo(list) { if (!WORLD.qm) return; WORLD.qm = false; const r = Array.isArray(list) && list.find(x => x && /^[A-Z0-9]{5}$/.test(x.code) && x.code !== NET.code); if (r) { netStatus('Found ' + (cleanName(r.name) || 'a') + "'s room — joining…"); netJoin(r.code); } else { netStatus('No open rooms right now — opening one for you.'); NET.pubNext = true; netHost(); } }
-async function quickMatch() { netStatus('Looking for an open room…'); WORLD.qm = true; await worldConnect(); let n = 0; const tick = () => { if (!WORLD.qm) return; if (WORLD.on) { if (WORLD.hub) quickGo(worldRooms()); else try { WORLD.hc.send({ t: 'rooms' }); } catch (e) {} } if (WORLD.qm && ++n < 10) setTimeout(tick, 1000); else if (WORLD.qm) quickGo([]); }; tick(); }
+async function quickMatch() { if (PG) { if (!pgOnline()) return netStatus('Online play is not available here.'); pgBind(); netStatus('Looking for an open room…'); netClose(); try { const code = await MP().joinOrCreateRoom({ maxPlayers: 12, filter: { v: 1 } }); NET.pub = true; pgEnter(code, !!MP().isHost); } catch (e) { netStatus('Could not find or open a room (' + ((e && e.code) || 'connection error') + ').'); } return; }
+  netStatus('Looking for an open room…'); WORLD.qm = true; await worldConnect(); let n = 0; const tick = () => { if (!WORLD.qm) return; if (WORLD.on) { if (WORLD.hub) quickGo(worldRooms()); else try { WORLD.hc.send({ t: 'rooms' }); } catch (e) {} } if (WORLD.qm && ++n < 10) setTimeout(tick, 1000); else if (WORLD.qm) quickGo([]); }; tick(); }
 function worldHi() { if (!WORLD.on) return; if (WORLD.hub) WORLD.me = worldHiMsg(); else if (WORLD.hc && WORLD.hc.open) WORLD.hc.send(worldHiMsg()); }
 async function worldConnect() {
   if (WORLD.peer) return; try { await loadPeer(); } catch (e) { return; }
@@ -1218,7 +1233,7 @@ function buildMenus() {
   const seg = (id, fn) => $(id).querySelectorAll('button').forEach(b => b.onclick = () => { $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); });
   $('btnOnline').onclick = () => { initAudio(); show('online'); $('netName').value = SAVE.name; netStatus(''); };
   $('btnShop').onclick = () => { initAudio(); openShop(); }; $('btnShopBack').onclick = closeShop; $('btnShopAct').onclick = shopAct; seg('segShop', v => { SH.tab = v; SH.sel = null; renderShop(); });
-  $('btnBoard').onclick = () => { boardTab = NET.on && !PG ? 'room' : 'me'; show('board'); renderBoard(); }; $('btnBoardBack').onclick = () => show(NET.on ? 'lobby' : 'home'); seg('segBoard', v => { boardTab = v; renderBoard(); });
+  $('btnBoard').onclick = () => { boardTab = NET.on ? 'room' : 'me'; show('board'); renderBoard(); }; $('btnBoardBack').onclick = () => show(NET.on ? 'lobby' : 'home'); seg('segBoard', v => { boardTab = v; renderBoard(); });
   $('btnFriends').onclick = () => { show('friends'); $('frNote').textContent = ''; renderFriends(); worldConnect(); friendsAsk(); }; $('btnFriendsBack').onclick = () => show('home'); $('btnFrAdd').onclick = addFriend; $('btnFrCopy').onclick = e => copyText(SAVE.uid, e.currentTarget);
   $('btnSettings').onclick = () => { show('settings'); applySettings(); }; $('btnSetBack').onclick = () => { SAVE.name = cleanName($('setName').value); saveSave(); show('home'); };
   seg('segSound', v => { SAVE.set.mute = v === 'off'; saveSave(); applySettings(); }); seg('segGfx', v => { SAVE.set.hq = v === 'hq'; saveSave(); applySettings(); });
@@ -1231,12 +1246,12 @@ function buildMenus() {
   const ld = $('lobDriver'); DRIVERS.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name + ' · ' + d.team; ld.appendChild(o); });
   ld.onchange = () => { selectDriver(DRIVERS.find(d => d.id === ld.value) || DRIVERS[0]); if (NET.host) { NET.players[0] = meP(); netLobby(); } else netSend(Object.assign({ t: 'hello' }, meP())); };
   const lt = $('lobTrack'); TRACKS.forEach((t, i) => { const o = document.createElement('option'); o.value = i; o.textContent = t.name + ' — ' + t.sub; lt.appendChild(o); });
-  lt.onchange = () => { NET.track = +lt.value; netLobby(); }; $('lobDiff').onchange = () => { G.diff = +$('lobDiff').value; netLobby(); }; $('lobBots').onchange = () => { NET.bots = $('lobBots').checked; netLobby(); }; $('lobPub').onchange = () => { NET.pub = $('lobPub').checked; netLobby(); }; $('btnQuick').onclick = () => { saveName(); quickMatch(); };
+  lt.onchange = () => { NET.track = +lt.value; netLobby(); }; $('lobDiff').onchange = () => { G.diff = +$('lobDiff').value; netLobby(); }; $('lobBots').onchange = () => { NET.bots = $('lobBots').checked; netLobby(); }; $('lobPub').onchange = () => { NET.pub = $('lobPub').checked; if (PG) try { MP().setRoomVisible(NET.pub); } catch (e) {} netLobby(); }; $('btnQuick').onclick = () => { saveName(); quickMatch(); };
   // chat
   $('chatBtn').onclick = () => CHAT.open ? closeChat() : openChat(NET.on ? 'room' : 'world'); $('chatClose').onclick = closeChat; seg('segChat', v => { CHAT.tab = v; chatMeta(); chatRender(); });
   $('chatForm').addEventListener('submit', e => { e.preventDefault(); chatSend(); });
   $('btnDriver').onclick = () => { G.pickOnly = true; $('btnToSetup').textContent = 'Confirm driver'; show('garage'); };
-  if (PG) for (const id of ['btnOnline', 'btnFriends', 'chatBtn', 'segBoard']) $(id).classList.add('gone');
+  if (PG) { for (const id of ['btnFriends', 'chatBtn', 'btnMic', 'micInfo', 'netNameField']) $(id).classList.add('gone'); if (!pgOnline()) for (const id of ['btnOnline', 'segBoard']) $(id).classList.add('gone'); $('netCode').maxLength = 10; }
   applySettings(); paintCoins(); chatMeta();
 }
 
@@ -1247,7 +1262,7 @@ function payReturn() { if (PG) return; // back from the checkout page: credit th
 }
 function dailyBonus() { const day = new Date().toISOString().slice(0, 10); if (SAVE.day === day) return; const first = !SAVE.day; SAVE.day = day; if (!first) SAVE.coins += 100; saveSave(); paintCoins(); $('mmToast').textContent = first ? 'Welcome! You start with ' + SAVE.coins + ' coins — win more by racing.' : 'Daily bonus: +100 coins'; $('mmToast').classList.add('on'); setTimeout(() => $('mmToast').classList.remove('on'), 6000); }
 loadAudio();
-track(loadCarModel()).then(() => { buildUI(); buildMenus(); attract(); dailyBonus(); payReturn(); requestAnimationFrame(frame); if (!PG) setTimeout(worldConnect, 2500); });
+track(loadCarModel()).then(() => { buildUI(); buildMenus(); attract(); dailyBonus(); payReturn(); requestAnimationFrame(frame); if (!PG) setTimeout(worldConnect, 2500); else if (pgOnline()) { let rid = ''; try { rid = MP().launchRoomId || ''; } catch (e) {} if (rid) { show('online'); netJoin(rid); } } });
 
 /* debug / test hook */
-window.__G = { PG, AUD, TUT, sfx, quickMatch, NET, WORLD, SAVE, CHAT, VOICE, useItem, netHost, netJoin, netStart, saveSave, worldSay, renderShop, G, get T() { return T; }, TRACKS, DRIVERS, keys, update, startRace, sim(sec, dt = 1 / 60) { for (let i = 0, n = Math.round(sec / dt); i < n; i++) update(dt); } };
+window.__G = { pgOnline, netLeave, PG, AUD, TUT, sfx, quickMatch, NET, WORLD, SAVE, CHAT, VOICE, useItem, netHost, netJoin, netStart, saveSave, worldSay, renderShop, G, get T() { return T; }, TRACKS, DRIVERS, keys, update, startRace, sim(sec, dt = 1 / 60) { for (let i = 0, n = Math.round(sec / dt); i < n; i++) update(dt); } };

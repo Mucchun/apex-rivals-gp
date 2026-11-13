@@ -229,7 +229,7 @@ html,body{-webkit-touch-callout:none;touch-action:manipulation}
   <div class="panel narrow">
     <h2>Play online</h2>
     <p class="note">Race real people: up to 12 players per room, and bots can fill the empty grid slots. Quick match drops you into an open room; or create your own and share its code.</p>
-    <div class="field"><label class="cap" for="netName">Your name</label><input id="netName" maxlength="12" autocomplete="off" placeholder="Driver name"></div>
+    <div class="field" id="netNameField"><label class="cap" for="netName">Your name</label><input id="netName" maxlength="12" autocomplete="off" placeholder="Driver name"></div>
     <button class="big" id="btnQuick">QUICK MATCH</button>
     <button class="alt" id="btnHost">Create a private room</button>
     <div class="row nowrap"><input id="netCode" maxlength="5" autocomplete="off" placeholder="ROOM CODE" aria-label="Room code" style="text-transform:uppercase"><button id="btnJoin">Join</button></div>
@@ -368,6 +368,6 @@ addEventListener('unhandledrejection',function(e){show('Error: '+(e.reason&&e.re
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <script>setTimeout(function(){var l=document.getElementById("loading");if(l&&!window.__alive)l.classList.add("out")},16000);addEventListener("error",function(){var l=document.getElementById("loading");if(l)l.classList.add("out")});</script>
-<script type="module" src="./game.js?v=1794600020"></script>
+<script type="module" src="./game.js?v=1794600021"></script>
 </body>
 </html>

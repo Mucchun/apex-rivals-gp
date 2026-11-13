@@ -26,7 +26,7 @@ loader = '''<script>
 html = html.replace(m.group(0), loader)
 assert html.index('playgama-bridge.js') < html.index('<meta') or True
 open(os.path.join(OUT, 'index.html'), 'w').write(html)
-cfg = {"advertisement": {"interstitial": {"placementFallback": "race_end", "placements": [{"id": "race_end"}]}, "rewarded": {"placementFallback": "double_coins", "placements": [{"id": "double_coins"}]}}}
+cfg = {"saas": {"publicToken": "cmwf23fcs00c1lz0hwx9r08zh"}, "advertisement": {"interstitial": {"placementFallback": "race_end", "placements": [{"id": "race_end"}]}, "rewarded": {"placementFallback": "double_coins", "placements": [{"id": "double_coins"}]}}}
 json.dump(cfg, open(os.path.join(OUT, 'playgama-bridge-config.json'), 'w'), indent=2)
 zp = os.path.join(ROOT, 'apex-rivals-gp-playgama-%s.zip' % VER)
 if os.path.exists(zp): os.remove(zp)
