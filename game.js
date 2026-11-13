@@ -669,7 +669,7 @@ const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done:
 function ldPaint() {
   const el = performance.now() - LD.since, v = LD.vid, vf = v.duration ? v.currentTime / v.duration : el / LD.max;
   LD.bp = Math.max(LD.bp || 0, Math.min(LD.total ? LD.done / LD.total : 0, LD.ended ? 1 : vf)); LD.bar.style.width = Math.round(100 * LD.bp) + '%';
-  if (LD.on && LD.done >= LD.total && (LD.ended || el > LD.max)) ldHide();
+  if (LD.on && LD.done >= LD.total && (LD.ended || (el > LD.max && (v.paused || !v.currentTime)) || el > 20000)) ldHide();
 }
 LD.vid.addEventListener('ended', () => { if (LD.done >= LD.total) { LD.ended = true; ldPaint(); } else ldPlay(); });
 setInterval(() => { if (LD.on) ldPaint(); }, 100);
