@@ -18,9 +18,13 @@ html = html.replace('<head>', '<head>\n<script src="https://bridge.playgama.com/
 m = re.search(r'<script type="module" src="\./game\.js[^"]*"></script>', html); assert m
 loader = '''<script>
 (function(){
-  function start(){ import('./game.js'); }
+  var started = false;
+  function fail(msg){ var l = document.getElementById('loading'); if (l) l.classList.add('out'); var e = document.getElementById('err'); if (!e) { e = document.createElement('div'); e.id = 'err'; document.body.appendChild(e); } e.style.zIndex = 60; e.textContent = msg; }
+  function start(){ if (started) return; started = true; import('./game.js').catch(function(err){ fail('The game could not start: ' + (err && err.message ? err.message : 'unknown error')); }); }
+  if (location.protocol === 'file:') { fail('This game cannot run by double-clicking index.html: browsers block game files opened straight from disk. Upload the files to the portal, or use the "Play locally" launcher next to them.'); return; }
   if (!window.bridge) { start(); return; }
-  bridge.initialize().then(function(){ window.__pgReady = true; start(); }).catch(function(){ start(); });
+  var t = setTimeout(start, 6000); // if the platform SDK never answers, start without it
+  try { bridge.initialize().then(function(){ clearTimeout(t); if (!started) window.__pgReady = true; start(); }).catch(function(){ clearTimeout(t); start(); }); } catch (e) { clearTimeout(t); start(); }
 })();
 </script>'''
 html = html.replace(m.group(0), loader)
