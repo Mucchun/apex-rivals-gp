@@ -170,14 +170,14 @@ function makeStand(width, th) {
 const propCache = {};
 function loadProp(name) {
   if (propCache[name]) return propCache[name];
-  return propCache[name] = new Promise(res => {
+  return propCache[name] = track(new Promise(res => {
     const to = setTimeout(() => res(null), 20000);
     new GLTFLoader().load('./models/' + name + '.glb', gltf => {
       clearTimeout(to); const sc = gltf.scene; sc.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(sc), size = box.getSize(new THREE.Vector3()), cen = box.getCenter(new THREE.Vector3()), parts = [];
       sc.traverse(o => { if (!o.isMesh) return; const geo = o.geometry.clone().applyMatrix4(o.matrixWorld); geo.translate(-cen.x, -box.min.y, -cen.z); geo.scale(1 / size.y, 1 / size.y, 1 / size.y); if (o.material.map) o.material.map.anisotropy = 4; parts.push({ geo, map: o.material.map || null }); });
       res(parts.length ? { parts, aspect: Math.max(size.x, size.z) / size.y } : null);
     }, undefined, () => { clearTimeout(to); res(null); });
-  });
+  }));
 }
 function buildWorld(def) {
   if (world) { scene.remove(world); world.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material._own) { if (o.material.map && o.material.map._own) o.material.map.dispose(); o.material.dispose(); } }); }
@@ -441,11 +441,14 @@ function playerInput() {
   const touch = G.touch;
   return { thr: keys.up || (touch && !keys.brake) ? 1 : 0, brk: keys.down || keys.brake ? 1 : 0, turn: (keys.left ? 1 : 0) - (keys.right ? 1 : 0), drift: !!keys.drift };
 }
+const CAR_C = [-1.85, 0, 1.85], CAR_D = 2.4;
 function aiInput(c, dt) {
   const N = T.n;
   c.laneT -= dt; if (c.laneT <= 0) { c.laneT = rnd(2.5, 7); c.lane = rnd(-5.5, 5.5); }
   // racing line: drift towards the inside of upcoming corners
-  const kA = T.k[(c.ti + 14) % N]; const lane = clamp(c.lane + clamp(kA * 260, -4, 4), -6.5, 6.5);
+  const kA = T.k[(c.ti + 14) % N]; let lane = clamp(c.lane + clamp(kA * 260, -4, 4), -6.5, 6.5);
+  // pull out from behind a slower car instead of driving into it
+  { const sh = Math.sin(c.h), ch = Math.cos(c.h); let near = 18; for (const o of G.cars) { if (o === c) continue; const dx = o.x - c.x, dz = o.z - c.z, f = dx * sh + dz * ch; if (f > 0 && f < near && Math.abs(o.lat - c.lat) < 3.4 && o.v < c.v + 3) { near = f; lane = clamp(o.lat + (c.lat === o.lat ? (o.lat > 0 ? -1 : 1) : Math.sign(c.lat - o.lat)) * 4.4, -6.5, 6.5); if (Math.abs(lane - o.lat) < 3.4) lane = clamp(o.lat - Math.sign(lane - o.lat || 1) * 4.4, -6.5, 6.5); } } }
   const la = Math.floor(5 + c.v * .2), j = (c.ti + la) % N;
   const tx = T.px[j] + T.nx[j] * lane, tz = T.pz[j] + T.nz[j] * lane;
   const diff = wrap(Math.atan2(tx - c.x, tz - c.z) - c.h);
@@ -462,7 +465,7 @@ function startRace(trackIdx) {
   G.phase = 'count'; G.t = 0; G.rt = 0; G.lightsOut = 6 + rnd(.2, 1.1); G.finT = 0; G.paused = false; G.thrDown = null; G.camH = G.player.h;
   show('hud'); $('lights').classList.remove('hidden'); $('hTrack').textContent = TRACKS[trackIdx].name.toUpperCase(); $('hBest').textContent = '';
   for (const k in keys) keys[k] = false;
-  $('touch').classList.add('on'); initAudio(); updateHud(true);
+  $('touch').classList.add('on'); initAudio(); updateHud(true); ldShow(900);
 }
 function attract() { G.phase = 'menu'; buildWorld(pick(TRACKS)); spawnCars(null); for (const c of G.cars) c.launch = 0; $('touch').classList.remove('on'); }
 function finishRace() {
@@ -525,7 +528,17 @@ function update(dt) {
     }
     // car vs car
     const cs = G.cars;
-    for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) { const a = cs[i], b = cs[j], dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz; if (d2 < 9.6 && d2 > 1e-4) { const d = Math.sqrt(d2), p = (3.1 - d) / 2, ux = dx / d, uz = dz / d; a.x -= ux * p; a.z -= uz * p; b.x += ux * p; b.z += uz * p; const dv = (a.v - b.v) * .25; a.v -= dv; b.v += dv; } }
+    for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+      const a = cs[i], b = cs[j], dx = b.x - a.x, dz = b.z - a.z; if (dx * dx + dz * dz > 64) continue;
+      // each car is three circles along its length, so noses and tails collide too
+      const sa = Math.sin(a.h), ca = Math.cos(a.h), sb = Math.sin(b.h), cb = Math.cos(b.h); let pen = 0, ux = 0, uz = 0;
+      for (const oa of CAR_C) for (const ob of CAR_C) { const ex = dx + sb * ob - sa * oa, ez = dz + cb * ob - ca * oa, d2 = ex * ex + ez * ez; if (d2 < CAR_D * CAR_D && d2 > 1e-6) { const d = Math.sqrt(d2); if (CAR_D - d > pen) { pen = CAR_D - d; ux = ex / d; uz = ez / d; } } }
+      if (!pen) continue;
+      const h = pen / 2 + .01; a.x -= ux * h; a.z -= uz * h; b.x += ux * h; b.z += uz * h;
+      const fa = dx * sa + dz * ca, la = dx * ca - dz * sa;
+      if (Math.abs(fa) > Math.abs(la)) { const rear = fa > 0 ? a : b, front = fa > 0 ? b : a; if (rear.v > front.v) { const dv = (rear.v - front.v) * .5; rear.v -= dv * .8; front.v += dv * .2; } }
+      a.mesh.g.position.set(a.x, 0, a.z); b.mesh.g.position.set(b.x, 0, b.z);
+    }
     // item boxes
     for (const b of boxes) { if (b.off > 0) { b.off -= dt; if (b.off <= 0) b.m.visible = true; continue; } b.m.rotation.y += dt * 2; b.m.rotation.x += dt * 1.3; for (const c of cs) { const dx = c.x - b.x, dz = c.z - b.z; if (dx * dx + dz * dz < 6.5) { b.off = 4; b.m.visible = false; if (!c.item && c.fin == null && G.phase !== 'menu') { c.item = rollItem(c); c.itemT = rnd(1.5, 6); if (c === pl) beep(740, .1, 'triangle'); } for (let i = 0; i < 8; i++) spark(b.x, 1.5, b.z, rnd(-6, 6), rnd(2, 8), rnd(-6, 6), '#ffd23f', .4); break; } } }
     // oil
@@ -644,13 +657,19 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - last) / 1000, 1 / 20); last = now;
-  if (!G.paused && G.phase !== 'results') { update(dt); if (G.player && G.phase !== 'menu') updateHud(); }
+  if (!G.paused && G.phase !== 'results' && !(LD.on && G.phase === 'count')) { update(dt); if (G.player && G.phase !== 'menu') updateHud(); }
   updateCamera(dt); updateEngine();
   if (skyDome) skyDome.position.copy(camera.position);
   for (const c of crowd) { if (c.flag) c.o.rotation.y = Math.sin(now * .004 + c.ph) * .5; else c.o.position.y = Math.max(0, Math.sin(now * .001 * c.sp + c.ph)) * .16; }
   renderer.render(scene, camera);
 }
-loadCarModel().then(() => { buildUI(); attract(); requestAnimationFrame(frame); });
+/* loading screen: video backdrop + progress bar, shown at boot and while a circuit's scenery downloads */
+const LD = { el: $('loading'), bar: $('ldBar'), vid: $('ldVid'), total: 0, done: 0, on: true, since: performance.now(), min: 1800, t: 0 };
+function ldPaint() { LD.bar.style.width = (LD.total ? Math.round(100 * LD.done / LD.total) : 0) + '%'; if (LD.on && LD.done >= LD.total) { clearTimeout(LD.t); LD.t = setTimeout(ldHide, Math.max(0, LD.min - (performance.now() - LD.since))); } }
+function track(p) { LD.total++; ldPaint(); return p.then(v => { LD.done++; ldPaint(); return v; }); }
+function ldHide() { if (LD.done < LD.total) return; LD.on = false; LD.el.classList.add('out'); setTimeout(() => { if (!LD.on) LD.vid.pause(); }, 600); }
+function ldShow(min) { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.since = performance.now(); LD.min = min; LD.el.classList.remove('out'); const pr = LD.vid.play(); if (pr) pr.catch(() => {}); ldPaint(); }
+track(loadCarModel()).then(() => { buildUI(); attract(); requestAnimationFrame(frame); });
 
 /* debug / test hook */
 window.__G = { G, get T() { return T; }, TRACKS, DRIVERS, keys, update, startRace, sim(sec, dt = 1 / 60) { for (let i = 0, n = Math.round(sec / dt); i < n; i++) update(dt); } };
