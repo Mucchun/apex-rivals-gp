@@ -110,6 +110,50 @@ td u{display:inline-block;width:5px;height:14px;border-radius:2px;margin-right:8
 #ldBar{height:100%;width:0;background:var(--red);border-radius:3px;transition:width .3s ease}
 .ldtxt{margin:0;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--ink);opacity:.85}
 @media (prefers-reduced-motion:reduce){#loading,#ldBar{transition:none}}
+/* main menu + new screens */
+#home{background:linear-gradient(90deg,rgba(10,11,16,.82),rgba(10,11,16,.08) 42%,rgba(10,11,16,.08) 60%,rgba(10,11,16,.8))}
+.mm{display:flex;justify-content:space-between;align-items:center;gap:24px;width:min(100%,1500px);flex-wrap:wrap}
+.mmL{display:flex;flex-direction:column;gap:16px;align-items:flex-start;max-width:520px}
+.mmL h1{text-align:left;font-size:clamp(38px,6.2vw,84px)}
+.mmR{display:flex;flex-direction:column;gap:10px;min-width:min(100%,280px)}
+.mmR button{width:100%;text-align:left}
+.pcard{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:6px 16px 6px 16px;padding:8px 14px 8px 8px}
+.pcard canvas{width:64px;height:64px}.pcard b{display:block;font-size:17px}.pcard small{color:var(--muted);font-size:13px}.pcard>div{display:flex;flex-direction:column;gap:1px}
+.coin{display:inline-flex;align-items:center;gap:6px;background:rgba(10,11,16,.75);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-weight:700;font-size:16px}.coin b{color:var(--gold);font-family:var(--display);font-style:italic}.coin small{color:var(--muted);font-weight:600}
+.mmtoast{margin:0;color:var(--gold);font-weight:700;opacity:0;transition:opacity .4s;min-height:1.3em}.mmtoast.on{opacity:1}
+button.sm{font-size:13px;padding:8px 14px}
+button:disabled{opacity:.45;cursor:default;transform:none;filter:none}
+.panel.narrow{width:min(100%,520px)}
+.screen.side{align-items:flex-end;padding-right:max(18px,4vw);background:linear-gradient(90deg,rgba(10,11,16,0) 30%,rgba(10,11,16,.85))}
+.row.between{justify-content:space-between}.row.nowrap{flex-wrap:nowrap}.row.nowrap input{flex:1;min-width:0}
+.note{margin:0;color:#c9cde0;font-size:14px;line-height:1.45}
+.field{display:flex;flex-direction:column;gap:6px}
+input,select{font:600 16px var(--body);color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:4px 10px 4px 10px;padding:11px 12px;user-select:text;-webkit-user-select:text}
+input:focus-visible,select:focus-visible{outline:2px solid #fff;outline-offset:1px}
+select option{color:#111}
+.check{display:flex;align-items:center;gap:8px;font-size:15px}.check input{width:18px;height:18px;padding:0}
+.hostbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.code{font-family:var(--display);font-style:italic;letter-spacing:3px;color:var(--gold);user-select:text;-webkit-user-select:text}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:34vh;overflow:auto}
+.plist li{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border-radius:4px 10px 4px 10px;padding:8px 10px;font-size:15px}
+.plist li u{width:6px;height:22px;border-radius:2px;flex:none}.plist li small{color:var(--muted);flex:1;font-size:13px}.plist li span{color:var(--gold);font-weight:700}.plist li.empty{color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:#555a6b;flex:none}.dot.on{background:var(--green)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;max-height:38vh;overflow:auto;padding:2px}
+.scard{background:rgba(255,255,255,.05);border:2px solid transparent;border-radius:4px 12px 4px 12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--body);font-style:normal;letter-spacing:0;color:var(--ink)}
+.scard b{font-size:13px;line-height:1.15;text-align:center}.scard small{font-size:12px;color:var(--gold)}
+.scard.sel{border-color:var(--red);background:rgba(225,6,0,.16)}.scard.eq small{color:var(--green)}
+.sw{display:block;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.35)}.sw.ico{border:0;font-size:32px;font-style:normal;line-height:44px;text-align:center}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.stats div{background:rgba(255,255,255,.05);border-radius:4px 10px 4px 10px;padding:10px;text-align:center}.stats b{display:block;font-family:var(--display);font-style:italic;font-size:26px}.stats small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em}
+#boardBox table{width:100%;border-collapse:collapse;font-size:15px}#boardBox th{text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em;padding:6px}#boardBox td{padding:7px 6px;border-top:1px solid var(--line)}
+.coinline{margin:0;color:var(--gold);font-weight:700}
+#chatBtn{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:12px;z-index:30}
+#chat{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:58px;z-index:30;width:min(360px,calc(100vw - 24px));background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:6px 16px 6px 16px;padding:10px;display:flex;flex-direction:column;gap:8px}
+#chat.hidden{display:none}
+#chatLog{height:min(240px,34vh);overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.35;user-select:text;-webkit-user-select:text}
+#chatLog p{margin:0;overflow-wrap:anywhere}#chatLog b{color:var(--gold)}#chatLog .empty{color:var(--muted)}
+#chatInfo{color:var(--muted);font-size:12px}
+#chat .seg button{padding:6px 12px;font-size:13px}
+@media (max-width:820px){.mm{flex-direction:column;align-items:stretch}.mmL{align-items:center;max-width:none}.mmL h1{text-align:center}.screen.side{align-items:center;justify-content:flex-end;padding-right:18px;background:linear-gradient(180deg,rgba(10,11,16,0) 25%,rgba(10,11,16,.9) 55%)}.screen.side::before{flex:3 0 0px}.sgrid{max-height:24vh}}
 </style>
 </head>
 <body>
@@ -123,12 +167,104 @@ td u{display:inline-block;width:5px;height:14px;border-radius:2px;margin-right:8
 </div>
 
 <section class="screen" id="home">
-  <p class="kicker">Arcade Grand Prix Racing</p>
-  <h1>APEX <em>RIVALS</em> GP</h1>
-  <p class="sub">Twelve rival drivers, six circuits, open-wheel rockets. Slide through corners to charge a turbo, tuck into a slipstream to open the DRS, and use pit-wall power-ups to ruin everybody else's Sunday. Four-race championship, points at every flag, one podium.</p>
-  <div class="row"><button class="big" id="btnPlay">ENTER THE PADDOCK</button></div>
-  <p class="keys"><b>↑</b>/<b>W</b> throttle · <b>↓</b>/<b>S</b> brake · <b>←</b> <b>→</b> steer · hold <b>Shift</b> or <b>Space</b> while turning to slide — sparks go blue, orange, purple; release for turbo · <b>E</b> use power-up · <b>C</b> look back · <b>M</b> mute · <b>Esc</b> pause. Launch: hit the throttle just as the lights go out.</p>
+  <div class="mm">
+    <div class="mmL">
+      <p class="kicker">Arcade Grand Prix Racing</p>
+      <h1>APEX <em>RIVALS</em> GP</h1>
+      <div class="pcard"><canvas id="mmHelmet" width="168" height="168"></canvas><div><label class="cap">Your driver</label><b id="mmName"></b><small id="mmTeam"></small></div><button class="alt sm" id="btnDriver">Change</button></div>
+      <div class="coin">🪙 <b class="coinN">0</b> <small>coins</small></div>
+      <p class="mmtoast" id="mmToast" role="status"></p>
+    </div>
+    <nav class="mmR" aria-label="Main menu">
+      <button class="big" id="btnPlay">RACE</button>
+      <button id="btnOnline">PLAY ONLINE</button>
+      <button class="alt" id="btnShop">CAR SHOP</button>
+      <button class="alt" id="btnBoard">LEADERBOARD</button>
+      <button class="alt" id="btnFriends">FRIENDS</button>
+      <button class="alt" id="btnSettings">SETTINGS</button>
+    </nav>
+  </div>
 </section>
+
+<section class="screen hidden side" id="shop">
+  <div class="panel narrow">
+    <div class="row between"><h2>Car shop</h2><div class="coin">🪙 <b class="coinN">0</b></div></div>
+    <div class="seg" id="segShop"><button data-v="paint" class="on">Paint</button><button data-v="addon">Add-ons</button><button data-v="trail">Turbo flames</button><button data-v="coins" id="tabCoins" class="hidden">Get coins</button></div>
+    <div class="sgrid" id="sgrid"></div>
+    <p class="note" id="shopInfo"></p>
+    <div class="row"><button class="alt" id="btnShopBack">Back</button><button id="btnShopAct" style="flex:1">Buy</button></div>
+    <p class="note">Coins come from racing: more for a better finish, plus a daily bonus.</p>
+  </div>
+</section>
+
+<section class="screen hidden" id="online">
+  <div class="panel narrow">
+    <h2>Play online</h2>
+    <p class="note">Race real people: up to 12 players per room, and bots can fill the empty grid slots. Quick match drops you into an open room; or create your own and share its code.</p>
+    <div class="field"><label class="cap" for="netName">Your name</label><input id="netName" maxlength="12" autocomplete="off" placeholder="Driver name"></div>
+    <button class="big" id="btnQuick">QUICK MATCH</button>
+    <button class="alt" id="btnHost">Create a private room</button>
+    <div class="row nowrap"><input id="netCode" maxlength="5" autocomplete="off" placeholder="ROOM CODE" aria-label="Room code" style="text-transform:uppercase"><button id="btnJoin">Join</button></div>
+    <p class="note" id="netStatus" role="status"></p>
+    <div class="row"><button class="alt" id="btnOnlineBack">Back</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="lobby">
+  <div class="panel narrow">
+    <div class="row between"><h2>Room <span class="code" id="lobCode"></span></h2><button class="alt sm" id="btnCopy">Copy code</button></div>
+    <ul class="plist" id="lobList"></ul>
+    <div class="field"><label class="cap" for="lobDriver">Your driver</label><select id="lobDriver"></select></div>
+    <div id="lobHost" class="hostbox">
+      <div class="field"><label class="cap" for="lobTrack">Circuit</label><select id="lobTrack"></select></div>
+      <div class="field"><label class="cap" for="lobDiff">Bot skill</label><select id="lobDiff"><option value="0">Rookie</option><option value="1">Pro</option><option value="2">Legend</option></select></div>
+      <label class="check"><input type="checkbox" id="lobBots" checked> Fill the grid with bots</label>
+      <label class="check"><input type="checkbox" id="lobPub" checked> Open to quick match (anyone can join)</label>
+    </div>
+    <div class="row between"><button class="alt sm" id="btnMic">🎙 Mic off</button><small class="note" id="micInfo"></small><button class="alt sm" id="btnLobBoard">Room leaderboard</button></div>
+    <p class="note" id="lobNote" role="status"></p>
+    <div class="row"><button class="alt" id="btnLeave">Leave room</button><button class="big" id="btnNetStart">START RACE</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="board">
+  <div class="panel narrow">
+    <h2>Leaderboard</h2>
+    <div class="seg" id="segBoard"><button data-v="room">Online room</button><button data-v="me" class="on">My records</button></div>
+    <div id="boardBox"></div>
+    <div class="row"><button class="alt" id="btnBoardBack">Back</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="friends">
+  <div class="panel narrow">
+    <h2>Friends</h2>
+    <div class="row between"><span>Your friend code <b class="code" id="frCode"></b></span><button class="alt sm" id="btnFrCopy">Copy</button></div>
+    <div class="row nowrap"><input id="frIn" maxlength="8" autocomplete="off" placeholder="FRIEND CODE" aria-label="Friend code" style="text-transform:uppercase"><button id="btnFrAdd">Add</button></div>
+    <p class="note" id="frNote" role="status"></p>
+    <ul class="plist" id="frList"></ul>
+    <p class="note">Friends show as online while they have the game open. If one is in a room you can join it from here.</p>
+    <div class="row"><button class="alt" id="btnFriendsBack">Back</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="settings">
+  <div class="panel narrow">
+    <h2>Settings</h2>
+    <div class="field"><label class="cap" for="setName">Player name</label><input id="setName" maxlength="12" autocomplete="off" placeholder="Shown online and on your car"></div>
+    <div class="field"><label class="cap">Sound</label><div class="seg" id="segSound"><button data-v="on" class="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="field"><label class="cap">Graphics</label><div class="seg" id="segGfx"><button data-v="hq" class="on">Quality</button><button data-v="fast">Performance</button></div></div>
+    <p class="keys"><b>↑</b>/<b>W</b> throttle · <b>↓</b>/<b>S</b> brake · <b>←</b> <b>→</b> steer · hold <b>Shift</b> or <b>Space</b> while turning to slide, release for turbo · <b>E</b> use power-up · <b>C</b> look back · <b>M</b> mute · <b>Esc</b> pause</p>
+    <div class="row"><button class="alt" id="btnSetBack">Save and back</button><button class="alt sm" id="btnReset">Reset progress</button></div>
+  </div>
+</section>
+
+<button id="chatBtn" class="alt sm">💬 Chat</button>
+<aside id="chat" class="hidden" aria-label="Chat">
+  <div class="row between"><div class="seg" id="segChat"><button data-v="world" class="on">World</button><button data-v="room">Room</button></div><small id="chatInfo"></small><button class="alt sm" id="chatClose" aria-label="Close chat">✕</button></div>
+  <div id="chatLog" aria-live="polite"></div>
+  <form id="chatForm" class="row nowrap"><input id="chatIn" maxlength="140" autocomplete="off" placeholder="Say something…" aria-label="Chat message"><button class="sm">Send</button></form>
+</aside>
 
 <section class="screen hidden" id="garage">
   <div class="panel">
@@ -185,6 +321,7 @@ td u{display:inline-block;width:5px;height:14px;border-radius:2px;margin-right:8
     <p class="kicker" id="rKicker"></p>
     <h2 id="rTitle">Chequered flag</h2>
     <div class="cols"><div><label class="cap">Race classification</label><table id="rTable"></table></div><div id="rStandBox"><label class="cap">Championship standings</label><table id="rStand"></table></div></div>
+    <p class="coinline" id="rCoins"></p>
     <div class="row"><button id="btnNext">Next race</button><button class="alt" id="btnResQuit">Back to paddock</button></div>
   </div>
 </section>
@@ -200,6 +337,6 @@ addEventListener('unhandledrejection',function(e){show('Error: '+(e.reason&&e.re
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <script>setTimeout(function(){var l=document.getElementById("loading");if(l)l.classList.add("out")},16000);addEventListener("error",function(){var l=document.getElementById("loading");if(l)l.classList.add("out")});</script>
-<script type="module" src="./game.js?v=1794600006"></script>
+<script type="module" src="./game.js?v=1794600011"></script>
 </body>
 </html>
