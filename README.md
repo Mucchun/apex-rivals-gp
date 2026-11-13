@@ -22,7 +22,7 @@ Online play is peer-to-peer (WebRTC via PeerJS and its public signalling server)
 | E | Use power-up |
 | C | Look back |
 | M | Mute |
-| Esc | Pause |
+| P | Pause |
 
 Touch buttons appear on phones.
 
@@ -38,3 +38,11 @@ Then open http://localhost:5190/. No build step.
 
 - [three.js](https://threejs.org) (MIT) and [PeerJS](https://peerjs.com) (MIT), vendored in `vendor/`
 - Car and scenery models in `models/` generated with Meshy
+- Music: "5 Chiptunes (Action)" by Juhani Junkala (CC0, OpenGameArt)
+- Sound effects: "The Essential Retro Video Game Sound Effects Collection" by Juhani Junkala (CC0, OpenGameArt)
+- Engine loop: "Racing car engine sound loops" (CC0, OpenGameArt)
+- Fonts: Russo One and Titillium Web (SIL Open Font License), self-hosted in `fonts/`
+
+## Playgama build
+
+`python3 build_playgama.py 1.0.0` writes `dist-playgama/` and a zip for the Playgama developer console. That build loads the Playgama Bridge SDK first, saves through Bridge storage, shows Bridge ads between races and leaves out the peer-to-peer online features.

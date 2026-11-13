@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 
 window.__alive = true; // tells the page's failsafe that the game module started
+/* Playgama build: index.html loads the Bridge SDK and initialises it before importing this module. */
+const PG = typeof window.bridge !== 'undefined' && !!window.__pgReady;
+let pgRaw = null, saveT = 0;
+const LANG = PG ? String(bridge.platform.language || 'en') : 'en'; // the game ships in English, which is also the fallback
+document.documentElement.lang = 'en';
+if (PG) { try { const d = await bridge.storage.get(['apexgp.save']); pgRaw = d && d[0]; } catch (e) {} }
+let webGet = () => null, webSet = () => {}, webDel = () => {};
+webGet = () => localStorage.getItem('apexgp.save'); /*WEB-ONLY*/
+webSet = v => localStorage.setItem('apexgp.save', v); /*WEB-ONLY*/
+webDel = () => localStorage.removeItem('apexgp.save'); /*WEB-ONLY*/
 /* ───────── helpers ───────── */
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -55,18 +65,44 @@ const TREES = {
 const W = 18, HALF = W / 2, WALL = HALF + 10, LIMIT = HALF + 8.4;
 const VMAX = 62, ACC = 30, BRK = 58, KMH = 5.2, LAPS = 3;
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1, 0, 0];
+/* ───────── icons (drawn, no emoji) ───────── */
+const svg = (b, c) => '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="' + (c || 'currentColor') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + b + '</svg>';
+const IC = {
+  ers: svg('<path d="M13 2 5 13h6l-1 9 9-12h-6z" fill="#ffd23f"/>', '#ffd23f'),
+  oil: svg('<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z" fill="#20222b"/><path d="M9.5 14a2.5 2.5 0 0 0 2.5 2.5"/>', '#c9cde0'),
+  tyre: svg('<circle cx="12" cy="12" r="9" fill="#20222b"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21"/>', '#c9cde0'),
+  shield: svg('<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z" fill="rgba(111,211,255,.3)"/><path d="m8.5 12 2.5 2.5 4.5-5"/>', '#6fd3ff'),
+  flag: svg('<path d="M5 22V3"/><path d="M5 4h13l-3 4.5 3 4.5H5z" fill="#ffd23f"/>', '#ffd23f'),
+  wings: svg('<path d="M3 15c3-9 10-11 18-11-1 3-3 4-5 5 1 1 2 1 3 1-2 3-5 4-7 4 0 2-3 4-9 1z" fill="rgba(255,255,255,.85)"/>', '#ffffff'),
+  hex: svg('<circle cx="12" cy="11" r="7" fill="rgba(180,107,255,.4)"/><path d="M7 21h10M9 18h6M10 9l2-3 2 3-2 3z"/>', '#b46bff'),
+  ice: svg('<path d="M12 2v20M3.5 7l17 10M20.5 7l-17 10M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5"/>', '#9fe8ff'),
+  portal: svg('<ellipse cx="12" cy="12" rx="6" ry="9" fill="rgba(122,75,255,.35)"/><path d="M12 7c2 1 3 3 3 5s-1 4-3 5c-1-1-1.6-3-1.6-5S11 8 12 7z"/>', '#a98bff'),
+  jam: svg('<path d="M12 21v-9"/><circle cx="12" cy="10" r="2" fill="#ff3fa4"/><path d="M7.5 14.5a6.5 6.5 0 0 1 0-9M16.5 5.500a6.5 6.5 0 0 1 0 9M4.500 17.500a11 11 0 0 1 0-15M19.500 2.500a11 11 0 0 1 0 15"/>', '#ff3fa4'),
+  bolt: svg('<path d="M7 14a4.500 4.500 0 0 1 .5-9 6 6 0 0 1 11.300 2A3.500 3.500 0 0 1 18 14" fill="rgba(255,255,255,.2)"/><path d="m13 11-3 5h4l-2 5" stroke="#fff27a"/>', '#e8ecf5'),
+  megawing: svg('<path d="M3 8h18v3H3zM6 11v7M18 11v7M4 18h16"/>'),
+  rockets: svg('<path d="M12 2c4 3 5 8 3 14H9C7 10 8 5 12 2z" fill="rgba(255,255,255,.2)"/><circle cx="12" cy="9" r="1.800"/><path d="M9 14l-3 4h3M15 14l3 4h-3M12 17v5" /><path d="M10.500 19.500 12 22l1.500-2.500" stroke="#ff8a1f"/>'),
+  fin: svg('<path d="M3 19h18C13 18 8 13 6 4 4 10 3 14 3 19z" fill="rgba(255,255,255,.2)"/>'),
+  pennant: svg('<path d="M6 22V2"/><path d="M6 3l13 4.500L6 12z" fill="#e10600"/>', '#ffffff'),
+  horns: svg('<path d="M4 4c0 7 2 11 6 12-1-3-3-5-6-12zM20 4c0 7-2 11-6 12 1-3 3-5 6-12z" fill="#d3151b"/><path d="M8 19a5 5 0 0 0 8 0"/>', '#ff5a5a'),
+  halo: svg('<ellipse cx="12" cy="7" rx="8" ry="3" stroke="#fff2a0"/><path d="M8 15a4 4 0 0 0 8 0v-1H8z" fill="rgba(255,255,255,.2)"/>'),
+  crown: svg('<path d="M3 18 2 7l5.500 4.500L12 4l4.500 7.500L22 7l-1 11z" fill="#ffc531"/><path d="M4 21h16"/>', '#ffc531'),
+  glow: c => svg('<ellipse cx="12" cy="15" rx="9" ry="4" fill="' + c + '" stroke="none" opacity=".55"/><ellipse cx="12" cy="15" rx="5.500" ry="2.300" fill="' + c + '" stroke="none"/><path d="M6 11h12l-2-4H8z"/>', '#e8ecf5'),
+  coin: '<i class="coinic" aria-hidden="true"></i>',
+  pause: svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
+  sound: svg('<path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path class="wave" d="M16.500 8.500a5 5 0 0 1 0 7M19 6a8.500 8.500 0 0 1 0 12"/><path class="mute" d="m17 9 5 6M22 9l-5 6"/>'),
+};
 const ITEMS = {
-  ers: { icon: '⚡', name: 'ERS BOOST' },
-  oil: { icon: '🛢️', name: 'OIL SLICK' },
-  tyre: { icon: '🛞', name: 'LOOSE TYRE' },
-  shield: { icon: '🛡️', name: 'SHIELD' },
-  flag: { icon: '🟨', name: 'YELLOW FLAG' },
-  wings: { icon: '🪽', name: 'WINGS' },
-  hex: { icon: '🔮', name: 'SHRINK HEX' },
-  ice: { icon: '❄️', name: 'ICE SPELL' },
-  portal: { icon: '🌀', name: 'PORTAL SWAP' },
-  jam: { icon: '📡', name: 'JAMMER' },
-  bolt: { icon: '🌩️', name: 'LIGHTNING' },
+  ers: { icon: IC.ers, name: 'ERS BOOST' },
+  oil: { icon: IC.oil, name: 'OIL SLICK' },
+  tyre: { icon: IC.tyre, name: 'LOOSE TYRE' },
+  shield: { icon: IC.shield, name: 'SHIELD' },
+  flag: { icon: IC.flag, name: 'YELLOW FLAG' },
+  wings: { icon: IC.wings, name: 'WINGS' },
+  hex: { icon: IC.hex, name: 'SHRINK HEX' },
+  ice: { icon: IC.ice, name: 'ICE SPELL' },
+  portal: { icon: IC.portal, name: 'PORTAL SWAP' },
+  jam: { icon: IC.jam, name: 'JAMMER' },
+  bolt: { icon: IC.bolt, name: 'LIGHTNING' },
 };
 
 /* ───────── shop catalogue: paint, add-ons, turbo flames (bought with race coins) ───────── */
@@ -83,16 +119,16 @@ const PAINTS = {
   prism: { name: 'Prism (colour-shift)', price: 800, col: '#ffffff', em: .4, rainbow: true },
 };
 const ADDONS = {
-  megawing: { slot: 'rear', name: 'Mega Wing', price: 300, icon: '🪁' },
-  rockets: { slot: 'rear', name: 'Rocket Boosters', price: 450, icon: '🚀' },
-  fin: { slot: 'top', name: 'Shark Fin', price: 200, icon: '🦈' },
-  flag: { slot: 'top', name: 'Pennant', price: 150, icon: '🚩' },
-  horns: { slot: 'top', name: 'Devil Horns', price: 250, icon: '😈' },
-  halo: { slot: 'top', name: 'Angel Halo', price: 250, icon: '😇' },
-  crown: { slot: 'top', name: 'Crown', price: 350, icon: '👑' },
-  glowc: { slot: 'under', name: 'Underglow · Cyan', price: 250, icon: '💠', col: '#35e0ff' },
-  glowp: { slot: 'under', name: 'Underglow · Pink', price: 250, icon: '💗', col: '#ff3fa4' },
-  glowg: { slot: 'under', name: 'Underglow · Gold', price: 250, icon: '✨', col: '#ffd23f' },
+  megawing: { slot: 'rear', name: 'Mega Wing', price: 300, icon: IC.megawing },
+  rockets: { slot: 'rear', name: 'Rocket Boosters', price: 450, icon: IC.rockets },
+  fin: { slot: 'top', name: 'Shark Fin', price: 200, icon: IC.fin },
+  flag: { slot: 'top', name: 'Pennant', price: 150, icon: IC.pennant },
+  horns: { slot: 'top', name: 'Devil Horns', price: 250, icon: IC.horns },
+  halo: { slot: 'top', name: 'Angel Halo', price: 250, icon: IC.halo },
+  crown: { slot: 'top', name: 'Crown', price: 350, icon: IC.crown },
+  glowc: { slot: 'under', name: 'Underglow · Cyan', price: 250, icon: IC.glow('#35e0ff'), col: '#35e0ff' },
+  glowp: { slot: 'under', name: 'Underglow · Pink', price: 250, icon: IC.glow('#ff3fa4'), col: '#ff3fa4' },
+  glowg: { slot: 'under', name: 'Underglow · Gold', price: 250, icon: IC.glow('#ffd23f'), col: '#ffd23f' },
 };
 const TRAILS = {
   std: { name: 'Standard flame', price: 0, cols: ['#ffd23f', '#ff5a1f'] },
@@ -113,17 +149,17 @@ const COINS = [120, 90, 75, 60, 50, 45, 40, 35, 30, 25, 20, 15];
 const cleanCos = o => { o = o && typeof o === 'object' ? o : {}; const ad = (k, s) => ADDONS[k] && ADDONS[k].slot === s ? k : null; return { p: PAINTS[o.p] ? o.p : 'team', rear: ad(o.rear, 'rear'), top: ad(o.top, 'top'), under: ad(o.under, 'under'), t: TRAILS[o.t] ? o.t : 'std' }; };
 const cleanName = s => String(s || '').replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 12);
 function loadSave() {
-  let s = {}; try { s = JSON.parse(localStorage.getItem('apexgp.save') || '{}') || {}; } catch (e) {}
+  let s = {}; try { const raw = PG ? pgRaw : webGet(); s = (typeof raw === 'string' ? JSON.parse(raw) : raw) || {}; } catch (e) {}
   const st = s.stats && typeof s.stats === 'object' ? s.stats : {};
   const uid = /^[A-Z0-9]{8}$/.test(s.uid) ? s.uid : Array.from({ length: 8 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ23456789')).join('');
   const friends = Array.isArray(s.friends) ? s.friends.filter(f => f && /^[A-Z0-9]{8}$/.test(f.id)).slice(0, 50).map(f => ({ id: f.id, name: cleanName(f.name) })) : [];
   return { uid, friends, day: typeof s.day === 'string' ? s.day : '', coins: Number.isFinite(s.coins) ? s.coins : 250, owned: Array.isArray(s.owned) ? s.owned.filter(x => typeof x === 'string') : [], eq: cleanCos(s.eq), name: cleanName(s.name), driver: typeof s.driver === 'string' ? s.driver : 'val',
     set: { mute: !!(s.set && s.set.mute), hq: !(s.set && s.set.hq === false) },
-    paid: Array.isArray(s.paid) ? s.paid.filter(x => typeof x === 'string').slice(-200) : [],
+    tut: !!s.tut, paid: Array.isArray(s.paid) ? s.paid.filter(x => typeof x === 'string').slice(-200) : [],
     stats: { races: st.races | 0, wins: st.wins | 0, podiums: st.podiums | 0, oraces: st.oraces | 0, owins: st.owins | 0, best: st.best && typeof st.best === 'object' ? st.best : {} } };
 }
 const SAVE = loadSave();
-function saveSave() { try { localStorage.setItem('apexgp.save', JSON.stringify(SAVE)); } catch (e) {} }
+function saveSave() { if (PG) { clearTimeout(saveT); saveT = setTimeout(() => { try { bridge.storage.set(['apexgp.save'], [JSON.stringify(SAVE)]).catch(() => {}); } catch (e) {} }, 500); } else try { webSet(JSON.stringify(SAVE)); } catch (e) {} }
 const carCol = (d, cos) => { const p = cos && PAINTS[cos.p]; return p && p.col && !p.rainbow ? p.col : chip(d); };
 
 /* ───────── renderer ───────── */
@@ -489,7 +525,7 @@ function hit(c, why) {
   if (c.shield > 0) { c.shield = 0; c.inv = 1; if (c === G.player) msg('SHIELD SAVED YOU', '#6fd3ff'); for (let i = 0; i < 14; i++) spark(c.x, 1, c.z, rnd(-8, 8), rnd(2, 8), rnd(-8, 8), '#6fd3ff', .5); return; }
   if (c.inv > 0 || c.spin > 0) return;
   c.spin = 1.15; c.inv = 3; c.drift = 0; c.charge = 0; c.boost = 0; c.fly = Math.min(c.fly, .3);
-  if (c === G.player) { msg(why, '#ffd23f'); beep(120, .3, 'sawtooth'); }
+  if (c === G.player) { msg(why, '#ffd23f'); sfx('hit'); }
 }
 /* hazards carry ids so every player in an online room removes the same one */
 let hazN = 0; const hazId = c => c.id + '.' + (hazN++) + '.' + (NET.id ? NET.id.slice(-5) : 'x');
@@ -500,7 +536,7 @@ function rmHaz(id) { for (const L of [G.oils, G.tyres]) { const i = L.findIndex(
 const FXCOL = { hex: '#b46bff', ice: '#9fe8ff', jam: '#ff3fa4', bolt: '#fff27a', slow: '#ffd23f', portal: '#7a4bff' };
 function zapFx(c, kind) {
   const col = FXCOL[kind] || '#fff';
-  if (kind === 'bolt') { for (let i = 0; i < 46; i++) spark(c.x + rnd(-.5, .5), rnd(0, 22), c.z + rnd(-.5, .5), rnd(-2, 2), rnd(-6, 2), rnd(-2, 2), i % 3 ? col : '#ffffff', rnd(.2, .5)); if (G.player && Math.hypot(c.x - G.player.x, c.z - G.player.z) < 200) beep(90, .35, 'sawtooth'); }
+  if (kind === 'bolt') { for (let i = 0; i < 46; i++) spark(c.x + rnd(-.5, .5), rnd(0, 22), c.z + rnd(-.5, .5), rnd(-2, 2), rnd(-6, 2), rnd(-2, 2), i % 3 ? col : '#ffffff', rnd(.2, .5)); if (G.player && Math.hypot(c.x - G.player.x, c.z - G.player.z) < 200) sfx('bolt'); }
   else for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; spark(c.x + Math.cos(a) * 2, rnd(.3, 2), c.z + Math.sin(a) * 2, Math.cos(a) * 3, rnd(2, 7), Math.sin(a) * 3, col, .6); }
 }
 function applyFx(c, kind, d, from) {
@@ -510,24 +546,24 @@ function applyFx(c, kind, d, from) {
   if (c.shield > 0) { c.shield = 0; c.inv = 1; if (me) msg('SHIELD SAVED YOU', '#6fd3ff'); return; }
   if (kind === 'slow') { c.slow = 3.6; if (me) msg('YELLOW FLAG — SLOW DOWN', '#ffd23f'); return; }
   if (c.inv > 0) return;
-  if (kind === 'hex') { c.tiny = 5; if (me) { msg('HEXED — YOU SHRANK!', FXCOL.hex); beep(200, .3, 'triangle'); } }
-  else if (kind === 'ice') { c.ice = 2.4; c.drift = 0; c.charge = 0; if (me) { msg('FROZEN SOLID!', FXCOL.ice); beep(1200, .25, 'sine'); } }
-  else if (kind === 'jam') { c.jam = 3.6; if (me) { msg('JAMMED — STEERING REVERSED!', FXCOL.jam); beep(160, .3, 'square'); } }
+  if (kind === 'hex') { c.tiny = 5; if (me) { msg('HEXED — YOU SHRANK!', FXCOL.hex); sfx('hex', .8); } }
+  else if (kind === 'ice') { c.ice = 2.4; c.drift = 0; c.charge = 0; if (me) { msg('FROZEN SOLID!', FXCOL.ice); sfx('ice', .7); } }
+  else if (kind === 'jam') { c.jam = 3.6; if (me) { msg('JAMMED — STEERING REVERSED!', FXCOL.jam); sfx('jam'); } }
 }
 function fxTo(o, kind, from, d) { zapFx(o, kind); if (o.local) applyFx(o, kind, d, from); else netEv({ k: 'fx', fx: kind, to: o.id, from: from ? from.id : -1, d }); }
 function useItem(c) {
-  const it = c.item; if (!it) return; c.item = null; const me = c === G.player, pos = o => o.prog + o.along / T.ds;
+  const it = c.item; if (!it) return; c.item = null; const me = c === G.player; if (me) TUT.used = true; const pos = o => o.prog + o.along / T.ds;
   const ahead = G.order.filter(o => o !== c && o.fin == null && pos(o) > pos(c)), next = ahead[ahead.length - 1];
-  if (it === 'ers') { c.boost = Math.max(c.boost, 2.3); if (me) beep(520, .25, 'square'); }
+  if (it === 'ers') { c.boost = Math.max(c.boost, 2.3); if (me) sfx('boost'); }
   else if (it === 'shield') c.shield = 9;
   else if (it === 'oil') { const x = c.x - Math.sin(c.h) * 4.5, z = c.z - Math.cos(c.h) * 4.5, id = hazId(c); spawnOil(x, z, c, id); netEv({ k: 'oil', x, z, owner: c.id, id }); }
   else if (it === 'tyre') { const s = c.ti + 2 + c.along / T.ds, lat = clamp(c.lat, -HALF + 1, HALF - 1), id = hazId(c); spawnTyre(s, lat, c, id); netEv({ k: 'tyre', s, lat, owner: c.id, id }); }
   else if (it === 'flag') { for (const o of ahead) fxTo(o, 'slow', c); if (me) msg(ahead.length ? 'YELLOW FLAG: ' + ahead.length + ' CARS SLOWED' : 'NOBODY AHEAD…', '#ffd23f'); }
-  else if (it === 'wings') { c.fly = 4.6; if (me) { msg('WINGS — FLY OVER THEM!', '#ffd23f'); beep(700, .3, 'triangle'); } }
+  else if (it === 'wings') { c.fly = 4.6; if (me) { msg('WINGS — FLY OVER THEM!', '#ffd23f'); sfx('wings'); } }
   else if (it === 'hex') { if (next) { fxTo(next, 'hex', c); if (me) msg('HEX! ' + next.tla + ' SHRANK', FXCOL.hex); } else c.boost = Math.max(c.boost, 1.2); }
   else if (it === 'ice') { const tg = ahead.slice(-2); for (const o of tg) fxTo(o, 'ice', c); if (me) msg(tg.length ? 'ICE SPELL! ' + tg.map(o => o.tla).join(' + ') + ' FROZEN' : 'NOBODY AHEAD…', FXCOL.ice); }
   else if (it === 'portal') {
-    if (next) { const mine = [c.x, c.z, c.h, c.prog], theirs = [next.x, next.z, next.h, next.prog]; zapFx(c, 'portal'); applyFx(c, 'portal', theirs, c); fxTo(next, 'portal', c, mine); if (me) { msg('PORTAL! SWAPPED WITH ' + next.tla, FXCOL.portal); beep(880, .3, 'sine'); } }
+    if (next) { const mine = [c.x, c.z, c.h, c.prog], theirs = [next.x, next.z, next.h, next.prog]; zapFx(c, 'portal'); applyFx(c, 'portal', theirs, c); fxTo(next, 'portal', c, mine); if (me) { msg('PORTAL! SWAPPED WITH ' + next.tla, FXCOL.portal); sfx('portal'); } }
     else c.boost = Math.max(c.boost, 1.2);
   }
   else if (it === 'jam') { let n = 0; for (const o of G.cars) if (o !== c && o.fin == null && Math.hypot(o.x - c.x, o.z - c.z) < 48) { fxTo(o, 'jam', c); n++; } if (me) msg(n ? 'JAMMER! ' + n + ' CARS SCRAMBLED' : 'NOBODY IN RANGE…', FXCOL.jam); }
@@ -565,7 +601,7 @@ function stepCar(c, dt, inp) {
   if (!c.drift && inp.drift && inp.turn && c.v > 24 && !c.off && c.spin <= 0) { c.drift = Math.sign(inp.turn); c.charge = 0; }
   if (c.drift && (!inp.drift || c.v < 15 || c.off)) {
     const lv = c.charge > 3 ? 3 : c.charge > 1.9 ? 2 : c.charge > .9 ? 1 : 0;
-    if (lv && !c.off) { c.boost = Math.max(c.boost, [0, .8, 1.4, 2.1][lv]); if (c === G.player) { beep(380 + lv * 120, .2, 'square'); msg(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][lv], ['', '#39a8ff', '#ff8a1f', '#b46bff'][lv]); } }
+    if (lv && !c.off) { c.boost = Math.max(c.boost, [0, .8, 1.4, 2.1][lv]); if (c === G.player) { sfx('turbo', .8, .85 + lv * .15); msg(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][lv], ['', '#39a8ff', '#ff8a1f', '#b46bff'][lv]); } }
     c.drift = 0; c.charge = 0;
   }
   let grip = c.ice > 0 ? 1.3 : 9;
@@ -629,9 +665,9 @@ function startRace(trackIdx, net) {
   G.phase = 'count'; G.t = 0; G.rt = 0; G.lightsOut = net ? net.lightsOut : 6 + rnd(.2, 1.1); G.finT = 0; G.paused = false; G.thrDown = null; G.lit = -1; G.camH = G.player ? G.player.h : 0;
   show('hud'); $('lights').classList.remove('hidden'); $('hTrack').textContent = TRACKS[trackIdx].name.toUpperCase(); $('hBest').textContent = '';
   for (const k in keys) keys[k] = false;
-  $('touch').classList.add('on'); initAudio(); updateHud(true); ldShow();
+  $('touch').classList.add('on'); initAudio(); music('music_race' + (1 + trackIdx % 3)); if (!SAVE.tut) { TUT.step = 0; TUT.t = 0; TUT.used = false; } updateHud(true); ldShow();
 }
-function attract() { G.phase = 'menu'; G.paused = false; buildWorld(pick(TRACKS)); spawnCars(G.driver, true); $('touch').classList.remove('on'); refreshHome(); }
+function attract() { G.phase = 'menu'; G.paused = false; buildWorld(pick(TRACKS)); spawnCars(G.driver, true); $('touch').classList.remove('on'); refreshHome(); music('music_menu'); }
 function finishRace() {
   const total = LAPS * T.n, net = G.mode === 'net', est = c => c.fin != null ? c.fin : G.rt + Math.max(0, total - c.prog) * T.ds / 46 + .001 * c.place;
   const res = G.cars.map(c => ({ c, fin: est(c) })).sort((a, b) => a.fin - b.fin);
@@ -652,7 +688,7 @@ function finishRace() {
   st.races++; if (pi === 0) st.wins++; if (pi < 3) st.podiums++; if (net) { st.oraces++; if (pi === 0) st.owins++; } if (bl && (!st.best[tid] || bl < st.best[tid])) st.best[tid] = Math.round(bl * 1000) / 1000;
   SAVE.coins += earn; saveSave(); paintCoins(); $('rCoins').textContent = '+' + earn + ' coins' + (champ ? ' (champion bonus included)' : '') + ' · you have ' + SAVE.coins;
   $('btnNext').textContent = net ? 'Back to lobby' : last ? (G.mode === 'cup' ? 'New season' : 'Race again') : 'Next race'; $('btnResQuit').textContent = net ? 'Leave room' : 'Back to paddock';
-  G.phase = 'results'; show('results'); stopEngine(); if (net && NET.host) netLobby();
+  G.phase = 'results'; show('results'); stopEngine(); music('music_menu'); offerDouble(earn); adBreak(); if (net && NET.host) netLobby();
 }
 function msg(text, color) { const e = $('hMsg'); e.textContent = text; e.style.color = color || '#fff'; e.classList.add('on'); clearTimeout(msg.t); msg.t = setTimeout(() => e.classList.remove('on'), 1500); }
 
@@ -661,10 +697,10 @@ function update(dt) {
   const live = G.mode === 'net' && NET.on, racing = G.phase === 'race' || G.phase === 'finish' || (G.phase === 'results' && live);
   if (G.phase === 'count') {
     const lit = G.t >= G.lightsOut ? 0 : clamp(Math.floor(G.t), 0, 5);
-    if (lit !== G.lit) { G.lit = lit; document.querySelectorAll('#lights i').forEach((e, i) => e.classList.toggle('on', i < lit)); gantryLights.forEach((m, i) => m.color.set(i < lit ? '#ff2a1a' : '#2a0705')); if (lit) beep(330, .12, 'square'); }
+    if (lit !== G.lit) { G.lit = lit; document.querySelectorAll('#lights i').forEach((e, i) => e.classList.toggle('on', i < lit)); gantryLights.forEach((m, i) => m.color.set(i < lit ? '#ff2a1a' : '#2a0705')); if (lit) sfx('count'); }
     const thr = playerInput().thr; if (thr && G.thrDown == null) G.thrDown = G.t; if (!thr) G.thrDown = null;
     if (G.t >= G.lightsOut) {
-      G.phase = 'race'; G.rt = 0; beep(660, .5, 'square'); setTimeout(() => $('lights').classList.add('hidden'), 700);
+      G.phase = 'race'; G.rt = 0; sfx('go'); setTimeout(() => $('lights').classList.add('hidden'), 700);
       const p = G.player, held = G.thrDown == null ? -1 : G.t - G.thrDown;
       if (held >= 0 && held < .5) { p.boost = 1.3; msg('PERFECT LAUNCH!', '#35e08a'); } else if (held > 2) { p.launch = 1; G.wheelspin = .9; msg('WHEELSPIN!', '#ffd23f'); } else msg('LIGHTS OUT!', '#fff');
       for (const c of G.cars) c.lapStart = 0;
@@ -693,7 +729,7 @@ function update(dt) {
       // laps
       const lap = Math.floor(c.prog / T.n);
       if (lap > c.lap) { c.lap = lap; if (lap >= 1) { const lt = G.rt - c.lapStart; if (c.best == null || lt < c.best) c.best = lt; c.lapStart = G.rt; if (c === pl && c.fin == null) { $('hBest').textContent = 'BEST ' + fmt(c.best); if (lap < LAPS) msg(lap === LAPS - 1 ? 'FINAL LAP' : 'LAP ' + (lap + 1), '#fff'); } } }
-      if (c.fin == null && c.prog >= LAPS * T.n) { c.fin = G.rt; c.ai = true; c.skill = .8; c.item = null; if (c === pl) { G.phase = 'finish'; G.finT = 0; msg(c.place === 1 ? 'YOU WIN!' : 'FINISHED P' + c.place, c.place === 1 ? '#ffd23f' : '#fff'); beep(880, .6, 'triangle'); } }
+      if (c.fin == null && c.prog >= LAPS * T.n) { c.fin = G.rt; c.ai = true; c.skill = .8; c.item = null; if (c === pl) { G.phase = 'finish'; G.finT = 0; msg(c.place === 1 ? 'YOU WIN!' : 'FINISHED P' + c.place, c.place === 1 ? '#ffd23f' : '#fff'); sfx('finish'); } }
     }
     // car vs car
     const cs = G.cars;
@@ -709,7 +745,7 @@ function update(dt) {
       a.mesh.g.position.set(a.x, a.y, a.z); b.mesh.g.position.set(b.x, b.y, b.z);
     }
     // item boxes
-    for (const b of boxes) { if (b.off > 0) { b.off -= dt; if (b.off <= 0) b.m.visible = true; continue; } b.m.rotation.y += dt * 2; b.m.rotation.x += dt * 1.3; for (const c of cs) { const dx = c.x - b.x, dz = c.z - b.z; if (dx * dx + dz * dz < 6.5) { b.off = 4; b.m.visible = false; if (!c.item && c.fin == null && c.local) { c.item = rollItem(c); c.itemT = rnd(1.5, 6); if (c === pl) beep(740, .1, 'triangle'); } for (let i = 0; i < 8; i++) spark(b.x, 1.5, b.z, rnd(-6, 6), rnd(2, 8), rnd(-6, 6), '#ffd23f', .4); break; } } }
+    for (const b of boxes) { if (b.off > 0) { b.off -= dt; if (b.off <= 0) b.m.visible = true; continue; } b.m.rotation.y += dt * 2; b.m.rotation.x += dt * 1.3; for (const c of cs) { const dx = c.x - b.x, dz = c.z - b.z; if (dx * dx + dz * dz < 6.5) { b.off = 4; b.m.visible = false; if (!c.item && c.fin == null && c.local) { c.item = rollItem(c); c.itemT = rnd(1.5, 6); if (c === pl) sfx('pickup'); } for (let i = 0; i < 8; i++) spark(b.x, 1.5, b.z, rnd(-6, 6), rnd(2, 8), rnd(-6, 6), '#ffd23f', .4); break; } } }
     // oil
     for (let i = G.oils.length - 1; i >= 0; i--) { const o = G.oils[i]; o.life -= dt; o.arm -= dt; let dead = o.life <= 0; if (!dead) for (const c of cs) { if (!c.local || c.y > 1 || (o.arm > 0 && c === o.owner)) continue; const dx = c.x - o.x, dz = c.z - o.z; if (dx * dx + dz * dz < 7.5 && c.spin <= 0 && c.inv <= 0) { hit(c, 'OIL! SPUN OUT'); dead = true; netEv({ k: 'rm', id: o.id }); break; } } if (dead) { scene.remove(o.m); G.oils.splice(i, 1); } }
     // loose tyres
@@ -766,7 +802,7 @@ function updateHud(force) {
   hudT -= 1; if (hudT > 0 && !force) { drawMinimap(); return; } hudT = 8;
   $('hPos').innerHTML = p.place + '<small>' + ord(p.place) + '</small>';
   $('hLapN').textContent = clamp(p.lap + 1, 1, LAPS) + '/' + LAPS;
-  const it = $('hItem'); it.classList.toggle('hidden', !p.item); if (p.item) { $('hItemIcon').textContent = ITEMS[p.item].icon; $('hItemName').textContent = ITEMS[p.item].name + ' · E'; }
+  const it = $('hItem'); it.classList.toggle('hidden', !p.item); if (p.item) { $('hItemIcon').innerHTML = ITEMS[p.item].icon; $('hItemName').textContent = ITEMS[p.item].name + ' · E'; }
   const lead = G.order[0];
   $('tower').innerHTML = G.order.map((c, i) => `<div class="${c === p ? 'me' : ''}"><b>${i + 1}</b><u style="background:${c.col}"></u>${esc(c.tla)}</div>`).join('');
   drawMinimap();
@@ -776,13 +812,67 @@ function drawMinimap() {
   for (let i = G.order.length - 1; i >= 0; i--) { const c = G.order[i], me = c === G.player; g.beginPath(); g.arc(c.x * mmS + mmX, c.z * mmS + mmZ, me ? 10 : 6.5, 0, 7); g.fillStyle = c.col; g.fill(); g.lineWidth = me ? 4 : 2; g.strokeStyle = me ? '#fff' : '#0a0b10'; g.stroke(); }
 }
 
-/* ───────── audio ───────── */
-let AC = null, eng = null;
-function initAudio() { if (AC) { if (AC.state === 'suspended') AC.resume(); startEngine(); return; } try { AC = new (window.AudioContext || window.webkitAudioContext)(); startEngine(); } catch (e) { AC = null; } }
-function startEngine() { if (!AC || eng) return; const o = AC.createOscillator(), o2 = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 900; g.gain.value = 0; o.connect(f); o2.connect(f); f.connect(g); g.connect(AC.destination); o.start(); o2.start(); eng = { o, o2, f, g }; }
+/* ───────── audio: recorded samples only (CC0 packs, see README) ───────── */
+const SND = ['hit', 'ice', 'jam', 'hex', 'count', 'turbo', 'boost', 'go', 'wings', 'pickup', 'buy', 'portal', 'finish', 'bolt', 'click', 'pause', 'engine'];
+const AUD = { raw: {}, buf: {}, music: null, track: '', want: '', hostMute: false, hidden: false };
+let AC = null, eng = null, master = null;
+function loadAudio() { for (const n of SND) track(fetch('./audio/' + n + '.mp3').then(r => r.arrayBuffer()).then(b => { AUD.raw[n] = b; }).catch(() => {})); }
+const audioOn = () => !G.muted && !AUD.hostMute && !AUD.hidden && !G.hostPaused;
+function audioGate() {
+  const on = audioOn(); $('hMute').classList.toggle('off', G.muted);
+  if (AUD.music) { if (on) { const p = AUD.music.play(); if (p) p.catch(() => {}); } else AUD.music.pause(); }
+  if (!AC) return; master.gain.value = on ? 1 : 0;
+  if (on && AC.state === 'suspended') AC.resume(); else if (!on && (AUD.hidden || G.hostPaused || AUD.hostMute) && AC.state === 'running') AC.suspend();
+}
+function initAudio() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
+    master = AC.createGain(); master.connect(AC.destination);
+    for (const n in AUD.raw) AC.decodeAudioData(AUD.raw[n].slice(0), b => { AUD.buf[n] = b; if (n === 'engine') startEngine(); }, () => {});
+  }
+  startEngine(); music(); audioGate();
+}
+function sfx(n, vol = 1, rate = 1) { if (!AC || !AUD.buf[n] || !audioOn()) return; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = AUD.buf[n]; s.playbackRate.value = rate; g.gain.value = vol * .5; s.connect(g); g.connect(master); s.start(); }
+// the engine file is the same 2/3-second loop repeated, so looping a whole number of periods inside it is seamless
+function startEngine() { if (!AC || eng || !AUD.buf.engine) return; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = AUD.buf.engine; s.loop = true; s.loopStart = 1; s.loopEnd = 5; g.gain.value = 0; s.connect(g); g.connect(master); s.start(0, 1); eng = { s, g }; }
 function stopEngine() { if (eng) eng.g.gain.setTargetAtTime(0, AC.currentTime, .1); }
-function updateEngine() { if (!eng || !G.player) return; const p = G.player, v = Math.abs(p.v), gear = Math.min(6, Math.floor(v / 10.5)), rpm = (v - gear * 10.5) / 10.5; const fr = 70 + gear * 14 + rpm * 150 + (G.phase === 'count' && playerInput().thr ? 120 : 0); eng.o.frequency.setTargetAtTime(fr, AC.currentTime, .04); eng.o2.frequency.setTargetAtTime(fr * .5, AC.currentTime, .04); eng.f.frequency.setTargetAtTime(600 + v * 30, AC.currentTime, .05); const on = !G.muted && !G.paused && (G.phase === 'race' || G.phase === 'count' || G.phase === 'finish'); eng.g.gain.setTargetAtTime(on ? .045 : 0, AC.currentTime, .08); }
-function beep(f, d, type) { if (!AC || G.muted) return; const o = AC.createOscillator(), g = AC.createGain(); o.type = type || 'sine'; o.frequency.value = f; g.gain.value = .07; g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + d); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + d); }
+function updateEngine() { if (!eng || !G.player) return; const p = G.player, v = Math.abs(p.v), gear = Math.min(6, Math.floor(v / 10.5)), rpm = (v - gear * 10.5) / 10.5; const rate = .55 + gear * .1 + rpm * .55 + (G.phase === 'count' && playerInput().thr ? .5 : 0); eng.s.playbackRate.setTargetAtTime(rate, AC.currentTime, .05); const on = !G.paused && (G.phase === 'race' || G.phase === 'count' || G.phase === 'finish'); eng.g.gain.setTargetAtTime(on ? .3 : 0, AC.currentTime, .08); }
+function music(name) { name = name || AUD.want; AUD.want = name; if (!AC || !name) return; if (AUD.track !== name) { if (AUD.music) AUD.music.pause(); const a = AUD.music = new Audio('./audio/' + name + '.mp3'); a.loop = true; a.volume = name === 'music_menu' ? .45 : .3; AUD.track = name; } audioGate(); }
+addEventListener('pointerdown', () => initAudio(), { once: true }); addEventListener('keydown', () => initAudio(), { once: true });
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button')) sfx('click', .7); });
+document.addEventListener('visibilitychange', () => { AUD.hidden = document.hidden; audioGate(); if (document.hidden && G.mode !== 'net' && ['count', 'race'].includes(G.phase) && !G.paused) togglePause(true); });
+document.addEventListener('contextmenu', e => { if (!(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) e.preventDefault(); });
+
+/* ───────── platform (Playgama Bridge): pause, mute, ads ───────── */
+function adBreak() { if (!PG) return; try { if (bridge.advertisement.isInterstitialSupported) bridge.advertisement.showInterstitial('race_end'); } catch (e) {} }
+function offerDouble(earn) { const b = $('btnDouble'); let ok = false; try { ok = PG && bridge.advertisement.isRewardedSupported; } catch (e) {} b.classList.toggle('hidden', !ok || !earn); G.dbl = ok ? earn : 0; b.textContent = 'Watch an ad: double your coins (+' + earn + ')'; b.disabled = false; }
+if (PG) {
+  try {
+    AUD.hostMute = bridge.platform.isAudioEnabled === false;
+    bridge.platform.on(bridge.EVENT_NAME.AUDIO_STATE_CHANGED, on => { AUD.hostMute = !on; audioGate(); });
+    bridge.platform.on(bridge.EVENT_NAME.PAUSE_STATE_CHANGED, p => { G.hostPaused = !!p; audioGate(); });
+    bridge.advertisement.on(bridge.EVENT_NAME.REWARDED_STATE_CHANGED, st => {
+      if (st === 'rewarded' && G.dblAsk && G.dbl) { SAVE.coins += G.dbl; $('rCoins').textContent = '+' + G.dbl * 2 + ' coins (doubled) · you have ' + SAVE.coins; G.dbl = 0; G.dblAsk = false; saveSave(); paintCoins(); $('btnDouble').classList.add('hidden'); sfx('buy'); }
+      else if (st === 'closed' || st === 'failed') { G.dblAsk = false; $('btnDouble').disabled = false; }
+    });
+  } catch (e) {}
+}
+
+/* ───────── first-race tutorial ───────── */
+const TUT = { step: 0, t: 0, used: false };
+function tutTick(dt) {
+  const el = $('tut'); if (SAVE.tut || G.mode === 'net' || !G.player || G.phase === 'results') { el.classList.remove('on'); return; }
+  const p = G.player, touch = G.touch; TUT.t += dt;
+  const steps = [
+    { text: touch ? 'The throttle is automatic. Steer with the arrow buttons and finish 3 laps in front!' : 'Hold UP or W to accelerate. Finish 3 laps in front of your rivals!', done: () => G.phase === 'race' && p.v > 28 },
+    { text: touch ? 'Steer with the left and right buttons' : 'Steer with LEFT and RIGHT, or A and D', done: () => TUT.t > 4 && (Math.abs(p.tin) > .5 || TUT.t > 9) },
+    { text: touch ? 'Hold SLIDE while turning, then let go for a turbo' : 'Hold SHIFT or SPACE while turning to slide, then release for a turbo', done: () => (p.boost > 0 && TUT.t > 2) || TUT.t > 24 },
+    { text: touch ? 'Drive through a ? box, then tap ITEM to use the power-up' : 'Drive through a ? box, then press E to use the power-up', done: () => TUT.used || TUT.t > 40 },
+    { text: 'That is everything. Good luck!', done: () => TUT.t > 3 },
+  ];
+  const s = steps[TUT.step]; if (!s) { SAVE.tut = true; saveSave(); el.classList.remove('on'); return; }
+  el.textContent = s.text; el.classList.add('on'); if (s.done()) { TUT.step++; TUT.t = 0; }
+}
 
 /* ───────── UI ───────── */
 const SCREENS = ['home', 'garage', 'setup', 'hud', 'pause', 'results', 'shop', 'online', 'lobby', 'board', 'friends', 'settings'];
@@ -806,20 +896,23 @@ function buildUI() {
   $('btnRace').onclick = () => { if (G.mode === 'cup') { while (G.cal.length < 4) { const i = Math.floor(Math.random() * TRACKS.length); if (!G.cal.includes(i)) G.cal.push(i); } G.round = 0; G.pts = {}; startRace(G.cal[0]); } else startRace(G.track); };
   $('btnNext').onclick = () => { if (G.mode === 'net') { if (NET.on) openLobby(); else netLeave(); return; } if (G.mode === 'cup' && G.round < G.cal.length - 1) { G.round++; startRace(G.cal[G.round]); } else if (G.mode === 'cup') { G.round = 0; G.pts = {}; startRace(G.cal[0]); } else startRace(G.track); };
   const quit = () => { if (G.mode === 'net') return netLeave(); stopEngine(); attract(); show('home'); };
+  $('btnDouble').onclick = () => { if (!PG || !G.dbl) return; G.dblAsk = true; $('btnDouble').disabled = true; try { bridge.advertisement.showRewarded('double_coins'); } catch (e) { G.dblAsk = false; } };
+  $('hPause').onclick = () => togglePause(); $('hMute').onclick = toggleMute; $('hPause').innerHTML = IC.pause; $('hMute').innerHTML = IC.sound;
   $('btnResQuit').onclick = quit; $('btnQuit').onclick = quit; $('btnResume').onclick = () => togglePause(false); $('btnRestart').onclick = () => { if (G.mode !== 'net') startRace(G.track); };
   // touch
   G.touch = matchMedia('(pointer:coarse)').matches;
   document.querySelectorAll('#touch button').forEach(b => { const k = b.dataset.k; const set = v => e => { e.preventDefault(); keys[k] = v; b.classList.toggle('dn', v); }; b.addEventListener('pointerdown', set(true)); b.addEventListener('pointerup', set(false)); b.addEventListener('pointercancel', set(false)); b.addEventListener('pointerleave', set(false)); });
 }
-function togglePause(v) { if (!['count', 'race', 'finish'].includes(G.phase)) return; G.paused = v == null ? !G.paused : v; show(G.paused ? 'pause' : 'hud'); }
+function toggleMute() { G.muted = !G.muted; SAVE.set.mute = G.muted; saveSave(); audioGate(); }
+function togglePause(v) { if (!['count', 'race', 'finish'].includes(G.phase)) return; G.paused = v == null ? !G.paused : v; show(G.paused ? 'pause' : 'hud'); sfx('pause'); }
 const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ShiftLeft: 'drift', ShiftRight: 'drift', Space: 'drift', KeyC: 'look' };
 addEventListener('keydown', e => {
   if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   const k = KEYMAP[e.code]; if (k) { keys[k] = true; if (G.phase !== 'menu' && G.phase !== 'results') e.preventDefault(); }
   if (e.repeat) return;
   if (e.code === 'KeyE' || e.code === 'KeyX' || e.code === 'Enter') { if (G.phase === 'race') keys.item = true; }
-  if (e.code === 'KeyM') { G.muted = !G.muted; SAVE.set.mute = G.muted; saveSave(); }
-  if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
+  if (e.code === 'KeyM') toggleMute();
+  if (e.code === 'KeyP') togglePause();
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -830,6 +923,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - last) / 1000, 1 / 20); last = now;
   const live = G.mode === 'net' && NET.on;
+  if (G.hostPaused) { renderer.render(scene, camera); return; }
+  if (!G.paused && ['count', 'race', 'finish'].includes(G.phase)) tutTick(dt);
   if ((!G.paused || live) && (G.phase !== 'results' || live) && !(LD.on && G.phase === 'count' && !live)) { update(dt); if (G.player && G.phase !== 'menu' && G.phase !== 'results') updateHud(); }
   updateCamera(dt); updateEngine();
   if (skyDome) skyDome.position.copy(camera.position);
@@ -852,7 +947,7 @@ setInterval(() => { if (LD.on) ldPaint(); }, 100);
 LD.vid.addEventListener('error', () => { LD.max = 5000; });
 function ldPlay() { try { LD.vid.currentTime = 0; } catch (e) {} const pr = LD.vid.play(); if (pr) pr.catch(() => {}); }
 function track(p) { LD.total++; return p.then(v => { LD.done++; if (LD.on) ldPaint(); return v; }); }
-function ldHide() { LD.on = false; LD.el.classList.add('out'); }
+function ldHide() { LD.on = false; LD.el.classList.add('out'); if (PG && !LD.ready) { LD.ready = true; try { bridge.platform.sendMessage('game_ready'); } catch (e) {} } }
 function ldShow() { if (LD.done >= LD.total) return; LD.total -= LD.done; LD.done = 0; LD.on = true; LD.ended = false; LD.noVid = false; LD.bp = 0; LD.since = performance.now(); LD.el.classList.remove('out'); ldPlay(); ldPaint(); }
 ldPlay();
 /* ───────── online: rooms over WebRTC (PeerJS). The room host runs the bots and relays everyone's cars ───────── */
@@ -1029,14 +1124,14 @@ async function voiceToggle() {
   try { VOICE.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { $('lobNote').textContent = 'Microphone blocked — allow it in the browser to talk.'; return; }
   if (!NET.on) { voiceMicOff(); return; } VOICE.on = true; VOICE.out.clear(); voiceCallAll(); voiceUi();
 }
-function voiceUi() { const b = $('btnMic'); if (!b) return; b.textContent = VOICE.on ? '🎙 Mic on' : '🎙 Mic off'; b.classList.toggle('alt', !VOICE.on); $('micInfo').textContent = VOICE.calls.size ? 'Voice linked with ' + VOICE.calls.size + ' player' + (VOICE.calls.size > 1 ? 's' : '') : 'Turn the mic on to talk to the room'; }
+function voiceUi() { const b = $('btnMic'); if (!b) return; b.textContent = VOICE.on ? 'Mic on' : 'Mic off'; b.classList.toggle('alt', !VOICE.on); $('micInfo').textContent = VOICE.calls.size ? 'Voice linked with ' + VOICE.calls.size + ' player' + (VOICE.calls.size > 1 ? 's' : '') : 'Turn the mic on to talk to the room'; }
 
 /* ───────── chat drawer (world + room) ───────── */
 const CHAT = { world: [], room: [], tab: 'world', open: false, unread: 0 };
 function chatAdd(ch, name, text, quiet) { const L = CHAT[ch]; if (!L) return; L.push({ name: cleanName(name) || 'Driver', text: String(text || '').slice(0, 140) }); if (L.length > 80) L.shift(); if (quiet) return; if (CHAT.open && CHAT.tab === ch) chatRender(); else { CHAT.unread++; chatMeta(); } }
 function chatRender() { const box = $('chatLog'); box.textContent = ''; const L = CHAT[CHAT.tab]; if (!L.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = CHAT.tab === 'world' ? 'Nobody has said anything yet. Say hi to the paddock.' : NET.on ? 'Room chat is empty.' : 'Join or create a room to use room chat.'; box.appendChild(p); } for (const m of L) { const p = document.createElement('p'), b = document.createElement('b'); b.textContent = m.name + ' '; p.appendChild(b); p.appendChild(document.createTextNode(m.text)); box.appendChild(p); } box.scrollTop = box.scrollHeight; }
-function chatMeta() { const b = $('chatBtn'); if (!b) return; b.textContent = '💬 Chat' + (CHAT.unread ? ' (' + CHAT.unread + ')' : ''); $('chatInfo').textContent = CHAT.tab === 'world' ? (WORLD.on ? WORLD.n + ' online' : 'connecting…') : NET.on ? 'Room ' + NET.code : 'not in a room'; document.querySelectorAll('#segChat button').forEach(x => x.classList.toggle('on', x.dataset.v === CHAT.tab)); }
-function openChat(tab) { if (tab) CHAT.tab = tab; CHAT.open = true; CHAT.unread = 0; $('chat').classList.remove('hidden'); chatMeta(); chatRender(); worldConnect(); }
+function chatMeta() { const b = $('chatBtn'); if (!b) return; b.textContent = 'Chat' + (CHAT.unread ? ' (' + CHAT.unread + ')' : ''); $('chatInfo').textContent = CHAT.tab === 'world' ? (WORLD.on ? WORLD.n + ' online' : 'connecting…') : NET.on ? 'Room ' + NET.code : 'not in a room'; document.querySelectorAll('#segChat button').forEach(x => x.classList.toggle('on', x.dataset.v === CHAT.tab)); }
+function openChat(tab) { if (PG) return; if (tab) CHAT.tab = tab; CHAT.open = true; CHAT.unread = 0; $('chat').classList.remove('hidden'); chatMeta(); chatRender(); worldConnect(); }
 function closeChat() { CHAT.open = false; $('chat').classList.add('hidden'); }
 function chatSend() { const i = $('chatIn'), text = i.value.trim(); if (!text) return; if (CHAT.tab === 'world') { if (worldSay(text)) i.value = ''; } else if (NET.on) { if (NET.host) roomChat(myName(), text); else netSend({ t: 'chat', text: text.slice(0, 140) }); i.value = ''; } }
 
@@ -1058,24 +1153,24 @@ function tryCos(it) { const c = Object.assign({}, SAVE.eq); if (it) { if (it.tab
 function renderShop() {
   paintCoins(); const list = shopList(SH.tab), g = $('sgrid'); g.textContent = '';
   if (!SH.sel || SH.sel.tab !== SH.tab) SH.sel = list.find(equipped) || list[0];
-  if (SH.tab === 'coins') { for (const it of list) { const b = document.createElement('button'); b.className = 'scard'; b.innerHTML = `<i class="sw ico">🪙</i><b>${it.pack.coins} coins</b><small>${esc(it.pack.price)}</small>`; b.onclick = () => { location.href = it.pack.url; }; g.appendChild(b); } lookPreview(SAVE.eq); G.shopFlame = null; $('shopInfo').textContent = 'Coin packs are paid with real money on a secure checkout page; the coins are added when you come back to the game.'; $('btnShopAct').classList.add('hidden'); return; }
+  if (SH.tab === 'coins') { for (const it of list) { const b = document.createElement('button'); b.className = 'scard'; b.innerHTML = `<i class="sw ico">${IC.coin}</i><b>${it.pack.coins} coins</b><small>${esc(it.pack.price)}</small>`; b.onclick = () => { location.href = it.pack.url; }; g.appendChild(b); } lookPreview(SAVE.eq); G.shopFlame = null; $('shopInfo').textContent = 'Coin packs are paid with real money on a secure checkout page; the coins are added when you come back to the game.'; $('btnShopAct').classList.add('hidden'); return; }
   $('btnShopAct').classList.remove('hidden');
   for (const it of list) {
     const b = document.createElement('button'); b.className = 'scard' + (SH.sel.id === it.id ? ' sel' : '') + (equipped(it) ? ' eq' : '');
     const sw = it.tab === 'addon' ? `<i class="sw ico">${it.icon}</i>` : `<i class="sw" style="background:${it.rainbow ? 'conic-gradient(#ff3f6a,#ffd23f,#35e08a,#39a8ff,#b46bff,#ff3f6a)' : it.tab === 'trail' ? 'linear-gradient(135deg,' + it.cols[0] + ',' + it.cols[1] + ')' : it.col || 'linear-gradient(135deg,' + G.driver.c1 + ' 50%,' + G.driver.c2 + ' 50%)'}"></i>`;
-    b.innerHTML = sw + `<b>${esc(it.name)}</b><small>${equipped(it) ? 'Equipped' : owned(it) ? 'Owned' : '🪙 ' + it.price}</small>`;
+    b.innerHTML = sw + `<b>${esc(it.name)}</b><small>${equipped(it) ? 'Equipped' : owned(it) ? 'Owned' : IC.coin + ' ' + it.price}</small>`;
     b.onclick = () => { SH.sel = it; renderShop(); }; g.appendChild(b);
   }
   const it = SH.sel, act = $('btnShopAct'); lookPreview(tryCos(it)); G.shopFlame = SH.tab === 'trail' ? it.k : null;
-  $('shopInfo').textContent = it.tab === 'addon' ? SLOTS[it.slot] + ' slot — one add-on per slot.' : it.tab === 'paint' ? 'Paint replaces your team colours on track and online.' : 'Colour of your turbo and ERS flames.';
+  $('shopInfo').textContent = it.tab === 'addon' ? SLOTS[it.slot] + ' slot — one add-on per slot.' : it.tab === 'paint' ? 'Paint replaces your team colours on track.' : 'Colour of your turbo and ERS flames.';
   act.disabled = false; act.classList.remove('alt');
-  if (!owned(it)) { const short = it.price - SAVE.coins; act.textContent = short > 0 ? 'Need ' + short + ' more coins' : 'Buy · 🪙 ' + it.price; act.disabled = short > 0; }
+  if (!owned(it)) { const short = it.price - SAVE.coins; act.textContent = short > 0 ? 'Need ' + short + ' more coins' : 'Buy for ' + it.price + ' coins'; act.disabled = short > 0; }
   else if (equipped(it)) { if (it.tab === 'addon') { act.textContent = 'Take off'; act.classList.add('alt'); } else { act.textContent = 'Equipped'; act.disabled = true; } }
   else act.textContent = 'Equip';
 }
 function shopAct() {
   const it = SH.sel; if (!it) return;
-  if (!owned(it)) { if (SAVE.coins < it.price) return; SAVE.coins -= it.price; SAVE.owned.push(it.id); beep(880, .15, 'triangle'); }
+  if (!owned(it)) { if (SAVE.coins < it.price) return; SAVE.coins -= it.price; SAVE.owned.push(it.id); sfx('buy'); }
   if (it.tab === 'paint') SAVE.eq.p = it.k; else if (it.tab === 'trail') SAVE.eq.t = it.k; else SAVE.eq[it.slot] = SAVE.eq[it.slot] === it.k ? null : it.k;
   saveSave(); renderShop();
 }
@@ -1117,17 +1212,17 @@ function renderFriends() {
 function addFriend() { const i = $('frIn'), id = i.value.toUpperCase().replace(/[^A-Z0-9]/g, ''), n = $('frNote'); if (id.length !== 8) { n.textContent = 'Friend codes are 8 characters.'; return; } if (id === SAVE.uid) { n.textContent = 'That is your own code.'; return; } if (SAVE.friends.some(f => f.id === id)) { n.textContent = 'Already on your list.'; return; } if (SAVE.friends.length >= 50) { n.textContent = 'Friends list is full (50).'; return; } SAVE.friends.push({ id, name: '' }); saveSave(); i.value = ''; n.textContent = 'Added. They show as online when they have the game open.'; renderFriends(); friendsAsk(); }
 setInterval(() => { if (WORLD.on && !$('friends').classList.contains('hidden')) friendsAsk(); }, 6000);
 /* settings */
-function applySettings() { G.muted = SAVE.set.mute; renderer.setPixelRatio(SAVE.set.hq ? Math.min(devicePixelRatio || 1, 2) : 1); resize(); document.querySelectorAll('#segSound button').forEach(x => x.classList.toggle('on', (x.dataset.v === 'off') === SAVE.set.mute)); document.querySelectorAll('#segGfx button').forEach(x => x.classList.toggle('on', (x.dataset.v === 'hq') === SAVE.set.hq)); $('setName').value = SAVE.name; }
+function applySettings() { G.muted = SAVE.set.mute; audioGate(); renderer.setPixelRatio(SAVE.set.hq ? Math.min(devicePixelRatio || 1, 2) : 1); resize(); document.querySelectorAll('#segSound button').forEach(x => x.classList.toggle('on', (x.dataset.v === 'off') === SAVE.set.mute)); document.querySelectorAll('#segGfx button').forEach(x => x.classList.toggle('on', (x.dataset.v === 'hq') === SAVE.set.hq)); $('setName').value = SAVE.name; }
 function copyText(t, btn) { const done = () => { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = o; }, 1200); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => {}); }
 function buildMenus() {
   const seg = (id, fn) => $(id).querySelectorAll('button').forEach(b => b.onclick = () => { $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); });
   $('btnOnline').onclick = () => { initAudio(); show('online'); $('netName').value = SAVE.name; netStatus(''); };
   $('btnShop').onclick = () => { initAudio(); openShop(); }; $('btnShopBack').onclick = closeShop; $('btnShopAct').onclick = shopAct; seg('segShop', v => { SH.tab = v; SH.sel = null; renderShop(); });
-  $('btnBoard').onclick = () => { boardTab = NET.on ? 'room' : 'me'; show('board'); renderBoard(); }; $('btnBoardBack').onclick = () => show(NET.on ? 'lobby' : 'home'); seg('segBoard', v => { boardTab = v; renderBoard(); });
+  $('btnBoard').onclick = () => { boardTab = NET.on && !PG ? 'room' : 'me'; show('board'); renderBoard(); }; $('btnBoardBack').onclick = () => show(NET.on ? 'lobby' : 'home'); seg('segBoard', v => { boardTab = v; renderBoard(); });
   $('btnFriends').onclick = () => { show('friends'); $('frNote').textContent = ''; renderFriends(); worldConnect(); friendsAsk(); }; $('btnFriendsBack').onclick = () => show('home'); $('btnFrAdd').onclick = addFriend; $('btnFrCopy').onclick = e => copyText(SAVE.uid, e.currentTarget);
   $('btnSettings').onclick = () => { show('settings'); applySettings(); }; $('btnSetBack').onclick = () => { SAVE.name = cleanName($('setName').value); saveSave(); show('home'); };
   seg('segSound', v => { SAVE.set.mute = v === 'off'; saveSave(); applySettings(); }); seg('segGfx', v => { SAVE.set.hq = v === 'hq'; saveSave(); applySettings(); });
-  let rs = 0; $('btnReset').onclick = e => { if (Date.now() - rs > 4000) { rs = Date.now(); e.currentTarget.textContent = 'Click again to erase coins, items and records'; return; } try { localStorage.removeItem('apexgp.save'); } catch (x) {} location.reload(); };
+  let rs = 0; $('btnReset').onclick = e => { if (Date.now() - rs > 4000) { rs = Date.now(); e.currentTarget.textContent = 'Click again to erase coins, items and records'; return; } clearTimeout(saveT); if (PG) { try { bridge.storage.delete(['apexgp.save']).then(() => location.reload(), () => location.reload()); } catch (x) { location.reload(); } } else { try { webDel(); } catch (x) {} location.reload(); } };
   // online
   const saveName = () => { SAVE.name = cleanName($('netName').value); saveSave(); };
   $('btnHost').onclick = () => { saveName(); netHost(); }; $('btnJoin').onclick = () => { saveName(); netJoin($('netCode').value); }; $('netCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnJoin').click(); });
@@ -1141,16 +1236,18 @@ function buildMenus() {
   $('chatBtn').onclick = () => CHAT.open ? closeChat() : openChat(NET.on ? 'room' : 'world'); $('chatClose').onclick = closeChat; seg('segChat', v => { CHAT.tab = v; chatMeta(); chatRender(); });
   $('chatForm').addEventListener('submit', e => { e.preventDefault(); chatSend(); });
   $('btnDriver').onclick = () => { G.pickOnly = true; $('btnToSetup').textContent = 'Confirm driver'; show('garage'); };
+  if (PG) for (const id of ['btnOnline', 'btnFriends', 'chatBtn', 'segBoard']) $(id).classList.add('gone');
   applySettings(); paintCoins(); chatMeta();
 }
 
-function payReturn() { // back from the checkout page: credit the pack once per checkout session
+function payReturn() { if (PG) return; // back from the checkout page: credit the pack once per checkout session
   const q = new URLSearchParams(location.search), pk = PAY.packs.find(x => x.url && x.id === q.get('pack')), sid = (q.get('session_id') || '').slice(0, 80); if (!pk || !sid) return;
   SAVE.paid = Array.isArray(SAVE.paid) ? SAVE.paid : []; if (!SAVE.paid.includes(sid)) { SAVE.paid.push(sid); SAVE.coins += pk.coins; saveSave(); paintCoins(); $('mmToast').textContent = 'Thank you! +' + pk.coins + ' coins added.'; $('mmToast').classList.add('on'); }
   history.replaceState(null, '', location.pathname);
 }
 function dailyBonus() { const day = new Date().toISOString().slice(0, 10); if (SAVE.day === day) return; const first = !SAVE.day; SAVE.day = day; if (!first) SAVE.coins += 100; saveSave(); paintCoins(); $('mmToast').textContent = first ? 'Welcome! You start with ' + SAVE.coins + ' coins — win more by racing.' : 'Daily bonus: +100 coins'; $('mmToast').classList.add('on'); setTimeout(() => $('mmToast').classList.remove('on'), 6000); }
-track(loadCarModel()).then(() => { buildUI(); buildMenus(); attract(); dailyBonus(); payReturn(); requestAnimationFrame(frame); setTimeout(worldConnect, 2500); });
+loadAudio();
+track(loadCarModel()).then(() => { buildUI(); buildMenus(); attract(); dailyBonus(); payReturn(); requestAnimationFrame(frame); if (!PG) setTimeout(worldConnect, 2500); });
 
 /* debug / test hook */
-window.__G = { quickMatch, NET, WORLD, SAVE, CHAT, VOICE, useItem, netHost, netJoin, netStart, saveSave, worldSay, renderShop, G, get T() { return T; }, TRACKS, DRIVERS, keys, update, startRace, sim(sec, dt = 1 / 60) { for (let i = 0, n = Math.round(sec / dt); i < n; i++) update(dt); } };
+window.__G = { PG, AUD, TUT, sfx, quickMatch, NET, WORLD, SAVE, CHAT, VOICE, useItem, netHost, netJoin, netStart, saveSave, worldSay, renderShop, G, get T() { return T; }, TRACKS, DRIVERS, keys, update, startRace, sim(sec, dt = 1 / 60) { for (let i = 0, n = Math.round(sec / dt); i < n; i++) update(dt); } };
