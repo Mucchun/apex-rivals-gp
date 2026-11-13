@@ -7,7 +7,7 @@ const PG = typeof window.bridge !== 'undefined' && !!window.__pgReady;
 let pgRaw = null, saveT = 0;
 const LANG = PG ? String(bridge.platform.language || 'en') : 'en'; // the game ships in English, which is also the fallback
 document.documentElement.lang = 'en';
-if (PG) { try { const d = await Promise.race([bridge.storage.get(['apexgp.save']), new Promise(r => setTimeout(() => r(null), 4000))]); pgRaw = d && d[0]; } catch (e) {} } // never let a slow platform save block start-up
+if (PG) pgRaw = window.__pgSave; // the page reads the save through Bridge storage before starting the game
 let webGet = () => null, webSet = () => {}, webDel = () => {};
 webGet = () => localStorage.getItem('apexgp.save'); /*WEB-ONLY*/
 webSet = v => localStorage.setItem('apexgp.save', v); /*WEB-ONLY*/
