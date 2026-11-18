@@ -1,0 +1,7 @@
+*.zip
+dist-playgama
+__pycache__
+serve.py
+build_playgama.py
+media/apex-rivals-gp-trailer.mp4
+.DS_Store
